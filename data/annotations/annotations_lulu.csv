@@ -1,0 +1,2 @@
+timestamp,user,patient_id,sejour_key,item_type,item_id,action,code,libelle,type_code,commentaire
+2026-07-08T20:30:03+00:00,lulu,REC-2024-00187,sej0,manuel,manual1,ajouté,aaa,aaa,CIM-10,
