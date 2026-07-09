@@ -1,20 +1,20 @@
 """
-Génère les fichiers parquet de référence ("données à revoir") à partir des
+Génère les fichiers Excel de référence ("données à revoir") à partir des
 données fictives reprises du prototype HTML.
 
 En production, remplacez ce script par votre propre pipeline d'export vers
-les mêmes fichiers parquet (mêmes noms de colonnes / tables).
+les mêmes fichiers Excel (mêmes noms de colonnes / tables).
 
 Tables produites dans data/ :
-    patients.parquet
-    sejours.parquet
-    parcours.parquet
-    documents.parquet
-    constantes.parquet
-    biologie.parquet
-    medicaments.parquet
-    codes_valides.parquet   (codage déjà posé par le clinicien, référence)
-    suggestions.parquet     (suggestions de codage à valider/rejeter/modifier)
+    patients.xlsx
+    sejours.xlsx
+    parcours.xlsx
+    documents.xlsx
+    constantes.xlsx
+    biologie.xlsx
+    medicaments.xlsx
+    codes_valides.xlsx   (codage déjà posé par le clinicien, référence)
+    suggestions.xlsx     (suggestions de codage à valider/rejeter/modifier)
 """
 import pandas as pd
 from pathlib import Path
@@ -360,7 +360,7 @@ def build_tables():
 if __name__ == "__main__":
     tables = build_tables()
     for name, df in tables.items():
-        path = DATA_DIR / f"{name}.parquet"
-        df.to_parquet(path, index=False)
+        path = DATA_DIR / f"{name}.xlsx"
+        df.to_excel(path, index=False)
         print(f"  {name:15s} -> {path}  ({len(df)} lignes)")
     print("\nDonnées de référence générées dans", DATA_DIR)

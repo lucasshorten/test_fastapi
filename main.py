@@ -1,7 +1,7 @@
 """
 Backend FastAPI :
 - sert le frontend statique (static/index.html — le prototype quasi inchangé)
-- expose les données de référence (parquet) en JSON, fusionnées avec les
+- expose les données de référence (Excel) en JSON, fusionnées avec les
   annotations de l'utilisateur courant
 - reçoit les annotations et les ajoute au CSV propre à cet utilisateur
 
@@ -22,7 +22,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 TABLE_NAMES = ["patients", "sejours", "parcours", "documents", "constantes",
                "biologie", "medicaments", "codes_valides", "suggestions"]
-TABLES = {n: pd.read_parquet(DATA_DIR / f"{n}.parquet") for n in TABLE_NAMES}
+TABLES = {n: pd.read_excel(DATA_DIR / f"{n}.xlsx") for n in TABLE_NAMES}
 
 app = FastAPI(title="Dossier patient — API")
 

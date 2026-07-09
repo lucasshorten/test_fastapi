@@ -97,13 +97,13 @@
   .sc-motif { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
   /* ---------- rail de navigation (module actif du tableau de bord) ---------- */
-  .nav-rail { width: 96px; flex: 0 0 96px; background: var(--panel); border-right: 1px solid var(--border); padding: 14px 0; display: flex; flex-direction: column; gap: 2px; }
+  .nav-rail { width: 96px; flex: 0 0 96px; height: calc(100vh - 190px); background: var(--panel); border-right: 1px solid var(--border); padding: 14px 0; display: flex; flex-direction: column; gap: 2px; }
   .rail-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 4px; cursor: pointer; color: var(--muted); font-size: 10.5px; }
   .rail-item .ri-icon { font-size: 18px; }
   .rail-item:hover { background: var(--gray-soft); }
   .rail-item.active { color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
   .H-main { display: flex; gap: 0; }
-  .H-content { flex: 1 1 auto; min-width: 0; max-height: calc(100vh - 190px); overflow-y: auto; }
+  .H-content { flex: 1 1 auto; min-width: 0; height: calc(100vh - 190px); overflow-y: auto; }
 
   .tab-panel { padding: 18px 20px; }
   .resume-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 12px 20px; margin-bottom: 6px; }

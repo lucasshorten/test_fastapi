@@ -4,7 +4,7 @@ Cette version garde **votre prototype HTML/CSS/JS quasiment tel quel**
 (mêmes styles, même rendu — bento, rail de navigation, chatbot, recherche…)
 et lui branche un petit backend Python (FastAPI) qui :
 
-- lit les données de référence depuis des fichiers **parquet** (lecture seule)
+- lit les données de référence depuis des fichiers **Excel** (lecture seule)
 - écrit chaque décision d'annotation dans un **CSV propre à chaque utilisateur**
 
 C'est la différence avec la première version (Streamlit) : ici l'interface
@@ -53,9 +53,9 @@ gestion des clics) est inchangé.
 
 ## Architecture des données (identique à la logique demandée)
 
-### Parquet (lecture seule) dans `data/`
+### Excel (lecture seule) dans `data/`
 `patients`, `sejours`, `parcours`, `documents`, `constantes`, `biologie`,
-`medicaments`, `codes_valides`, `suggestions` — un fichier par table.
+`medicaments`, `codes_valides`, `suggestions` — un fichier `.xlsx` par table.
 `generate_sample_data.py` reprend les données fictives de votre prototype ;
 remplacez-le par votre export réel en gardant les mêmes colonnes.
 
