@@ -114,10 +114,40 @@
   table.datatable th, table.datatable td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   table.datatable th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; }
 
-  .doc-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
-  .doc-card .doc-title { font-weight: 600; font-size: 13.5px; }
-  .doc-card .doc-meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-  .doc-card .doc-excerpt { font-size: 13px; line-height: 1.55; color: #33424d; }
+  .doc-title { font-weight: 600; font-size: 13.5px; }
+  .doc-meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .doc-excerpt { font-size: 13px; line-height: 1.55; color: #33424d; }
+
+  .doc-subtabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .doc-subtab { border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .doc-subtab:hover:not(.active) { background: var(--gray-soft); }
+  .doc-subtab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .acc-item { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .acc-header { width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
+  .acc-header:hover { background: var(--gray-soft); }
+  .acc-caret { color: var(--muted); font-size: 10px; flex-shrink: 0; width: 10px; }
+  .acc-title { font-weight: 600; font-size: 13.5px; }
+  .acc-meta { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; padding-left: 10px; }
+  .acc-body { padding: 0 14px 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .acc-body .doc-meta { margin-bottom: 6px; }
+
+  .fiche-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  .fiche-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
+  .fiche-value { font-size: 13px; background: var(--gray-soft); border-radius: 6px; padding: 6px 9px; border: 1px solid var(--border); }
+
+  /* ---------- tableau de bord des médicaments : grille jour par jour ---------- */
+  .med-name { font-weight: 600; font-size: 13px; }
+  .med-sub { color: var(--muted); font-size: 11px; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .med-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .med-grid { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+  .med-grid th, .med-grid td { padding: 8px 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; white-space: nowrap; }
+  .med-grid thead th { background: var(--gray-soft); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; font-family: var(--mono); }
+  .med-grid tbody tr:last-child td { border-bottom: none; }
+  .med-grid-label { text-align: left; min-width: 190px; background: var(--panel); position: sticky; left: 0; border-right: 2px solid var(--border); }
+  .med-grid thead .med-grid-label { background: var(--gray-soft); z-index: 1; }
+  .med-grid-cell.has-dose { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+  .med-grid-cell.out-of-range { background: var(--gray-soft); opacity: .5; }
 
   .marker-row { font-size: 12.5px; margin: 4px 0; display: flex; align-items: center; gap: 6px; }
   .marker-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
@@ -148,8 +178,12 @@
   .A-main { flex: 1 1 auto; min-width: 0; }
   .A-side {
     width: 380px; flex: 0 0 380px; background: var(--panel); border-left: 1px solid var(--border);
-    min-height: calc(100vh - 190px); padding: 16px; position: sticky; top: 0;
+    height: calc(100vh - 190px); padding: 16px; position: sticky; top: 0; overflow-y: auto;
   }
+  .A-side.collapsed { width: 44px; flex: 0 0 44px; padding: 16px 6px; overflow: hidden; }
+  .side-collapse-toggle { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; width: 28px; height: 28px; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .side-collapse-toggle:hover { background: var(--gray-soft); color: var(--text); }
+  .A-side.collapsed .side-collapse-toggle { margin: 0 auto; display: block; }
   .A-side h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin-bottom: 10px; }
   .A-side section { margin-bottom: 24px; }
   .validated-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -185,8 +219,7 @@
   .bento-tile.span-2 { grid-column: span 2; }
   .bento-grid.has-expanded .bento-tile { display: none; }
   .bento-grid.has-expanded .bento-tile.expanded { display: block; grid-column: 1 / -1; }
-  .bento-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--gray-soft); font-weight: 700; font-size: 12.5px; cursor: pointer; }
-  .bento-toggle { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .bento-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--gray-soft); font-weight: 700; font-size: 12.5px; }
   .bento-body { max-height: 320px; overflow-y: auto; }
   .bento-tile.expanded .bento-body { max-height: calc(100vh - 320px); }
   .bento-body .path-h { padding: 12px 14px; }
@@ -238,8 +271,8 @@ const SERVICE_GRADIENT = {
   "Pneumologie": "linear-gradient(135deg,#16a34a,#0891b2)"
 };
 const SERVICE_COLOR = { "Cardiologie": "#2563eb", "Chirurgie orthopédique": "#7c3aed", "Pneumologie": "#16a34a" };
-const KIND_COLOR = { parcours: "#7c3aed", document: "#475569", medicament: "#0891b2" };
-const KIND_ICON = { parcours: "🧭", document: "📄", medicament: "💊" };
+const KIND_COLOR = { parcours: "#7c3aed", document: "#475569", medicament: "#0891b2", fiche: "#0d9488", observation: "#b45309" };
+const KIND_ICON = { parcours: "🧭", document: "📄", medicament: "💊", fiche: "🧾", observation: "🩺" };
 
 /* ------------------------------------------------------------------ */
 /* State (mémoire uniquement — pas de persistance)                     */
@@ -254,17 +287,24 @@ let bentoExpanded = null;
 let searchState = { query: "", open: false };
 let contentSearch = { query: "", open: false, scope: "sejour" };
 let sidePanelTab = "codage"; // "codage" | "chatbot"
+let sidePanelCollapsed = false;
+let documentsSubTab = "documents"; // "documents" | "fiches" | "observations"
+let openDocumentId = null;
+let openFicheId = null;
+let openObservationId = null;
 let addCodeFormOpen = false;
 let chatDraft = "";
 let chatMessages = initialChatMessages();
 
 function initialChatMessages() {
-  return [{ from: "agent", text: "Bonjour, posez-moi une question sur ce dossier (parcours, documents, biologie, médicaments).", sources: [] }];
+  return [{ from: "agent", text: "Bonjour, posez-moi une question sur ce dossier (parcours, documents, fiches, observations, biologie, médicaments).", sources: [] }];
 }
 
 function patient() { return PATIENTS[currentPatientId]; }
 function sejour() { return patient().sejours[currentSejourId]; }
 function docById(id) { return sejour().documents.find(d => d.id === id); }
+function ficheById(id) { return sejour().fiches.find(f => f.id === id); }
+function observationById(id) { return sejour().observations.find(o => o.id === id); }
 function isActive(kind, id) { return activeHighlight.kind === kind && activeHighlight.id === id; }
 
 function formatDateFr(iso) { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; }
@@ -302,6 +342,15 @@ function sourceInfo(source) {
     const doc = docById(source.id);
     return { label: `${doc.titre} (${doc.date})`, html: highlightExcerpt(doc) };
   }
+  if (source.kind === "fiche") {
+    const f = ficheById(source.id);
+    return { label: `${f.titre} (${f.date})`,
+      html: f.champs.map(c => `<div><strong>${c.label} :</strong> ${c.valeur}</div>`).join("") };
+  }
+  if (source.kind === "observation") {
+    const o = observationById(source.id);
+    return { label: `Observation ${o.categorie} (${o.date})`, html: o.texte };
+  }
   const ev = sejour().parcours.find(e => e.id === source.id);
   return { label: `${ev.titre} (${ev.date})`, html: ev.detail };
 }
@@ -327,6 +376,8 @@ function answerChat(query) {
   s.documents.forEach(d => candidates.push({ kind: "document", id: d.id, label: d.titre, text: (d.titre + " " + (d.fullText || d.excerpt)).toLowerCase() }));
   s.parcours.forEach(e => candidates.push({ kind: "parcours", id: e.id, label: e.titre, text: (e.titre + " " + e.detail).toLowerCase() }));
   s.medicaments.forEach(m => candidates.push({ kind: "medicament", id: m.id, label: m.nom, text: (m.nom + " " + m.indication).toLowerCase() }));
+  s.fiches.forEach(f => candidates.push({ kind: "fiche", id: f.id, label: f.titre, text: (f.titre + " " + f.champs.map(c => c.label + " " + c.valeur).join(" ")).toLowerCase() }));
+  s.observations.forEach(o => candidates.push({ kind: "observation", id: o.id, label: `Observation — ${o.categorie}`, text: (o.categorie + " " + o.texte).toLowerCase() }));
 
   const scored = candidates
     .map(c => ({ ...c, score: words.reduce((acc, w) => acc + (c.text.includes(w) ? 1 : 0), 0) }))
@@ -376,6 +427,8 @@ function searchableItems(scope) {
     s.parcours.forEach(e => items.push({ sejourId: sid, kind: "parcours", id: e.id, label: e.titre, sub: e.detail, date: e.date }));
     s.documents.forEach(d => items.push({ sejourId: sid, kind: "document", id: d.id, label: d.titre, sub: d.excerpt, date: d.date }));
     s.medicaments.forEach(m => items.push({ sejourId: sid, kind: "medicament", id: m.id, label: m.nom, sub: `${m.dose} · ${m.indication}`, date: m.debut }));
+    s.fiches.forEach(f => items.push({ sejourId: sid, kind: "fiche", id: f.id, label: f.titre, sub: f.champs.map(c => c.valeur).join(" · "), date: f.date }));
+    s.observations.forEach(o => items.push({ sejourId: sid, kind: "observation", id: o.id, label: `Observation — ${o.categorie}`, sub: o.texte, date: o.date }));
   });
   return items;
 }
@@ -488,14 +541,149 @@ function renderParcoursPathH() {
 /* Contenu des onglets — vraies vues détaillées (Résumé / Parcours /
    Documents / Biologie / Médicaments)                                 */
 /* ------------------------------------------------------------------ */
-function renderMedicamentsList() {
+function isoDateLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function sejourDayList() {
+  const s = sejour();
+  const days = [];
+  const d = new Date(s.entree + "T00:00:00");
+  const last = new Date(s.sortie + "T00:00:00");
+  while (d <= last) {
+    days.push(isoDateLocal(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+function renderMedGridRow(m, days) {
+  const s = sejour();
+  const active = m.statut === "en cours";
+  const end = m.fin || s.sortie;
+  return `<tr class="${isActive('medicament',m.id)?'flash-highlight':''}" data-anchor="${m.id}">
+    <td class="med-grid-label">
+      <div class="med-name">${m.nom}</div>
+      <div class="med-sub">${m.dose} · ${m.voie} · ${m.frequence}</div>
+      <div class="med-sub">${statusDot(active?'good':'warn')} ${active ? 'En cours' : 'Arrêté le ' + formatDateFr(m.fin)}</div>
+    </td>
+    ${days.map(d => {
+      const doses = s.administrations.filter(a => a.medId === m.id && a.date === d);
+      if (doses.length) return `<td class="med-grid-cell has-dose">${doses.map(a => a.heure).join(" · ")}</td>`;
+      const withinWindow = d >= m.debut && d <= end;
+      return `<td class="med-grid-cell ${withinWindow ? '' : 'out-of-range'}">${withinWindow ? '—' : ''}</td>`;
+    }).join("")}
+  </tr>`;
+}
+
+function renderMedicamentsGrid() {
+  const meds = sejour().medicaments;
+  const days = sejourDayList();
+  return `<div class="med-grid-wrap">
+    <table class="med-grid">
+      <thead>
+        <tr>
+          <th class="med-grid-label"></th>
+          ${days.map(d => `<th>${formatDateFr(d)}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${meds.map(m => renderMedGridRow(m, days)).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderMedicamentsAdminTable() {
+  const s = sejour();
+  if (s.administrations.length === 0) return "";
+  const medById = id => s.medicaments.find(m => m.id === id);
+  const rows = [...s.administrations].sort((a,b) => (a.date+a.heure).localeCompare(b.date+b.heure));
+  return `<h4 style="margin:16px 0 8px">Détail des administrations</h4>
+    <table class="datatable">
+      <tr><th>Date</th><th>Heure</th><th>Médicament</th><th>Dose</th><th>Voie</th></tr>
+      ${rows.map(a => {
+        const m = medById(a.medId);
+        return `<tr><td>${formatDateFr(a.date)}</td><td>${a.heure}</td><td>${m ? m.nom : a.medId}</td><td>${m ? m.dose : ''}</td><td>${m ? m.voie : ''}</td></tr>`;
+      }).join("")}
+    </table>`;
+}
+
+function renderMedicamentsDashboard() {
   const meds = sejour().medicaments;
   if (meds.length === 0) return `<p style="color:var(--muted);font-size:12.5px">Aucun traitement enregistré pour ce séjour.</p>`;
-  return meds.map(m => `<div class="doc-card ${isActive('medicament',m.id)?'flash-highlight':''}" data-anchor="${m.id}">
-    <div class="doc-title">${m.nom} <span style="font-weight:400;color:var(--muted);font-size:12px">${m.dose} · ${m.voie} · ${m.frequence}</span></div>
-    <div class="doc-meta">${statusDot(m.statut === 'en cours' ? 'good' : 'warn')} ${m.statut === 'en cours' ? 'En cours' : 'Arrêté'} · depuis le ${formatDateFr(m.debut)}${m.fin ? ' → ' + formatDateFr(m.fin) : ''}</div>
-    <div class="doc-excerpt">Indication : ${m.indication} · Prescripteur : ${m.prescripteur}</div>
-  </div>`).join("");
+  return `${renderMedicamentsGrid()}${renderMedicamentsAdminTable()}`;
+}
+
+function renderDocumentsSubTabs() {
+  const tabs = [["documents", "📄", "Documents"], ["fiches", "🧾", "Fiches"], ["observations", "🩺", "Observations médicales"]];
+  return `<div class="doc-subtabs">
+    ${tabs.map(([key, icon, label]) => `<button class="doc-subtab ${documentsSubTab===key?'active':''}" data-action="set-documents-subtab" data-tab="${key}">${icon} ${label}</button>`).join("")}
+  </div>`;
+}
+
+function renderDocumentsList() {
+  const s = sejour();
+  if (s.documents.length === 0) return `<p style="color:var(--muted);font-size:12.5px">Aucun document pour ce séjour.</p>`;
+  return s.documents.map(d => {
+    const open = openDocumentId === d.id;
+    return `<div class="acc-item ${isActive('document',d.id)?'flash-highlight':''}" data-anchor="${d.id}">
+      <button class="acc-header" data-action="toggle-accordion" data-kind="document" data-id="${d.id}">
+        <span class="acc-caret">${open ? '▾' : '▸'}</span>
+        <span class="acc-title">${d.titre}</span>
+        <span class="acc-meta">${formatDateFr(d.date)} · ${d.uf}</span>
+      </button>
+      ${open ? `<div class="acc-body">
+        <div class="doc-meta">${d.type} · ${d.auteur}</div>
+        <div class="doc-excerpt">${highlightFullText(d)}</div>
+      </div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderFichesList() {
+  const s = sejour();
+  if (s.fiches.length === 0) return `<p style="color:var(--muted);font-size:12.5px">Aucune fiche enregistrée pour ce séjour.</p>`;
+  return s.fiches.map(f => {
+    const open = openFicheId === f.id;
+    return `<div class="acc-item ${isActive('fiche',f.id)?'flash-highlight':''}" data-anchor="${f.id}">
+      <button class="acc-header" data-action="toggle-accordion" data-kind="fiche" data-id="${f.id}">
+        <span class="acc-caret">${open ? '▾' : '▸'}</span>
+        <span class="acc-title">${f.titre}</span>
+        <span class="acc-meta">${formatDateFr(f.date)} · ${f.uf}</span>
+      </button>
+      ${open ? `<div class="acc-body">
+        <div class="doc-meta">${f.type} · ${f.auteur}</div>
+        <div class="fiche-form">
+          ${f.champs.map(c => `<div class="fiche-field"><label>${c.label}</label><div class="fiche-value">${f.highlight ? highlightTerm(c.valeur, f.highlight) : c.valeur}</div></div>`).join("")}
+        </div>
+      </div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderObservationsList() {
+  const s = sejour();
+  if (s.observations.length === 0) return `<p style="color:var(--muted);font-size:12.5px">Aucune observation médicale enregistrée pour ce séjour.</p>`;
+  return s.observations.map(o => {
+    const open = openObservationId === o.id;
+    return `<div class="acc-item ${isActive('observation',o.id)?'flash-highlight':''}" data-anchor="${o.id}">
+      <button class="acc-header" data-action="toggle-accordion" data-kind="observation" data-id="${o.id}">
+        <span class="acc-caret">${open ? '▾' : '▸'}</span>
+        <span class="acc-title">Observation — ${o.categorie}</span>
+        <span class="acc-meta">${formatDateFr(o.date)} · ${o.uf}</span>
+      </button>
+      ${open ? `<div class="acc-body">
+        <div class="doc-meta">${o.auteur}</div>
+        <div class="doc-excerpt">${o.highlight ? highlightTerm(o.texte, o.highlight) : o.texte}</div>
+      </div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderDocumentsSubContent() {
+  if (documentsSubTab === "fiches") return renderFichesList();
+  if (documentsSubTab === "observations") return renderObservationsList();
+  return renderDocumentsList();
 }
 
 function renderTabPanel(tab) {
@@ -534,12 +722,8 @@ function renderTabPanel(tab) {
   }
   if (tab === "documents") {
     return `<div class="tab-panel">
-      ${s.documents.map(d => `
-        <div class="doc-card ${isActive('document',d.id)?'flash-highlight':''}" data-anchor="${d.id}">
-          <div class="doc-title">${d.titre}</div>
-          <div class="doc-meta">${d.type} · ${d.auteur} · ${formatDateFr(d.date)}</div>
-          <div class="doc-excerpt">${highlightFullText(d)}</div>
-        </div>`).join("")}
+      ${renderDocumentsSubTabs()}
+      ${renderDocumentsSubContent()}
     </div>`;
   }
   if (tab === "biologie") {
@@ -571,7 +755,7 @@ function renderTabPanel(tab) {
     </div>`;
   }
   if (tab === "medicaments") {
-    return `<div class="tab-panel">${renderMedicamentsList()}</div>`;
+    return `<div class="tab-panel">${renderMedicamentsDashboard()}</div>`;
   }
   return "";
 }
@@ -699,8 +883,8 @@ function renderRightPanel() {
 function renderBentoTile(key, title, contentHtml, extraClass) {
   const expanded = bentoExpanded === key;
   return `<div class="bento-tile ${expanded?'expanded':''} ${extraClass||''}">
-    <div class="bento-head" data-action="toggle-bento" data-key="${key}">
-      <span>${title}</span><span class="bento-toggle">${expanded ? '⤢ Réduire' : '⤢ Agrandir'}</span>
+    <div class="bento-head">
+      <span>${title}</span>
     </div>
     <div class="bento-body">${contentHtml}</div>
   </div>`;
@@ -740,7 +924,10 @@ function renderVariantI() {
           </div>
         </div>
       </div>
-      <div class="A-side">${renderRightPanel()}</div>
+      <div class="A-side ${sidePanelCollapsed?'collapsed':''}">
+        <button class="side-collapse-toggle" data-action="toggle-side-panel" title="${sidePanelCollapsed?'Afficher le panneau de codage':'Réduire le panneau de codage'}">${sidePanelCollapsed?'◀':'▶'}</button>
+        ${sidePanelCollapsed ? '' : renderRightPanel()}
+      </div>
     </div>`;
 }
 
@@ -748,14 +935,29 @@ function renderVariantI() {
 /* Navigation patient / séjour                                          */
 /* ------------------------------------------------------------------ */
 function resetTransientState() {
+  // bentoExpanded et documentsSubTab ne sont volontairement pas réinitialisés ici :
+  // on reste sur le même onglet en changeant de séjour ou de patient.
   activeHighlight = { kind: null, id: null };
   panelState = { editingValidatedId: null, editingSuggestionId: null };
-  bentoExpanded = null;
   contentSearch = { query: "", open: false, scope: "sejour" };
   sidePanelTab = "codage";
   addCodeFormOpen = false;
   chatDraft = "";
   chatMessages = initialChatMessages();
+  openDocumentId = null;
+  openFicheId = null;
+  openObservationId = null;
+}
+
+function bentoForKind(kind) {
+  if (kind === "medicament") return "medicaments";
+  if (kind === "document" || kind === "fiche" || kind === "observation") return "documents";
+  return "parcours";
+}
+function syncDocumentsSubTab(kind, id) {
+  if (kind === "fiche") { documentsSubTab = "fiches"; openFicheId = id; }
+  else if (kind === "observation") { documentsSubTab = "observations"; openObservationId = id; }
+  else if (kind === "document") { documentsSubTab = "documents"; openDocumentId = id; }
 }
 function switchPatient(id) {
   currentPatientId = id;
@@ -774,7 +976,11 @@ function cyclePatient(dir) {
 /* Render dispatch                                                      */
 /* ------------------------------------------------------------------ */
 function render() {
+  const prevBar = document.querySelector(".sejours-bar");
+  const scrollLeft = prevBar ? prevBar.scrollLeft : 0;
   document.getElementById("app").innerHTML = renderTopBar() + renderSejoursBar() + renderVariantI();
+  const newBar = document.querySelector(".sejours-bar");
+  if (newBar) newBar.scrollLeft = scrollLeft;
 }
 
 /* ------------------------------------------------------------------ */
@@ -796,11 +1002,6 @@ document.addEventListener("click", (ev) => {
     return render();
   }
 
-  if (action === "toggle-bento") {
-    const key = el.dataset.key;
-    bentoExpanded = bentoExpanded === key ? null : key;
-    return render();
-  }
   if (action === "select-bento") {
     bentoExpanded = el.dataset.key === "overview" ? null : el.dataset.key;
     return render();
@@ -822,7 +1023,8 @@ document.addEventListener("click", (ev) => {
     const keptScope = contentSearch.scope;
     contentSearch = { query: "", open: false, scope: keptScope };
     activeHighlight = { kind, id: rid };
-    bentoExpanded = kind === "medicament" ? "medicaments" : (kind === "document" ? "documents" : "parcours");
+    bentoExpanded = bentoForKind(kind);
+    syncDocumentsSubTab(kind, rid);
     render();
     requestAnimationFrame(() => {
       const t = document.querySelector(`[data-anchor="${rid}"]`);
@@ -896,6 +1098,17 @@ document.addEventListener("click", (ev) => {
   }
 
   if (action === "set-side-tab") { sidePanelTab = el.dataset.tab; return render(); }
+  if (action === "toggle-side-panel") { sidePanelCollapsed = !sidePanelCollapsed; return render(); }
+  if (action === "set-documents-subtab") { documentsSubTab = el.dataset.tab; return render(); }
+
+  if (action === "toggle-accordion") {
+    const kind = el.dataset.kind;
+    const oid = el.dataset.id;
+    if (kind === "document") openDocumentId = openDocumentId === oid ? null : oid;
+    else if (kind === "fiche") openFicheId = openFicheId === oid ? null : oid;
+    else if (kind === "observation") openObservationId = openObservationId === oid ? null : oid;
+    return render();
+  }
 
   if (action === "send-chat") {
     const text = chatDraft.trim();
@@ -914,7 +1127,8 @@ document.addEventListener("click", (ev) => {
 
   if (action === "goto-source") {
     activeHighlight = { kind: el.dataset.kind, id: el.dataset.id };
-    bentoExpanded = activeHighlight.kind === "document" ? "documents" : "parcours";
+    bentoExpanded = bentoForKind(activeHighlight.kind);
+    syncDocumentsSubTab(activeHighlight.kind, activeHighlight.id);
     render();
     requestAnimationFrame(() => {
       const t = document.querySelector(`[data-anchor="${activeHighlight.id}"]`);

@@ -13,16 +13,31 @@ données change (fetch réseau au lieu de données codées en dur en mémoire JS
 
 ## Lancer l'application
 
+Trois commandes suffisent, à exécuter depuis le dossier du projet :
+
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt     # dépendances (une fois)
 python generate_sample_data.py      # génère les données de référence (une fois)
 uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Si la commande `uvicorn` n'est pas reconnue (fréquent sur Windows si le
+dossier `Scripts` de Python n'est pas dans le PATH), utilisez plutôt :
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Puis ouvrez `http://localhost:8000` (ou l'IP de la machine sur le réseau
 local pour que plusieurs personnes s'y connectent). Au premier chargement,
 un prompt demande le nom de l'annotateur — il est retenu ensuite dans le
 navigateur (`localStorage`) donc pas besoin de le retaper à chaque visite.
+
+Pour arrêter le serveur : `Ctrl+C` dans le terminal où il tourne.
+
+Si vous modifiez `generate_sample_data.py`, relancez-le pour régénérer les
+fichiers `.xlsx` dans `data/` — le serveur les relit à chaque redémarrage
+(pas besoin de relancer `pip install`).
 
 ## Ce qui a changé dans `static/index.html` par rapport à votre prototype
 
@@ -42,6 +57,29 @@ Uniquement le "câblage données", rien côté visuel :
 Tout le reste (CSS, structure des `render...()`, recherche, bento, chatbot,
 gestion des clics) est inchangé.
 
+## Évolutions ultérieures de l'interface
+
+Ajoutées après la migration initiale, toujours branchées sur les mêmes
+tables Excel / la même API :
+
+- **Onglet Documents** : trois sous-onglets — *Documents*, *Fiches*
+  (formulaires de liaison/suivi remplis, relus en lecture seule) et
+  *Observations médicales* (récapitulatif chronologique). Chaque élément
+  s'affiche sous forme de ligne repliée (titre · date · UF) qu'on déroule en
+  cliquant dessus. Un clic sur la source d'une suggestion de codage (📎)
+  ouvre directement le bon document/fiche/observation, déroulé, avec le
+  passage concerné surligné.
+- **Onglet Médicaments** : grille jour par jour (un médicament par ligne, un
+  jour par colonne, scrollable horizontalement, nom du médicament fixe à
+  gauche) montrant l'heure de chaque prise réellement administrée, avec un
+  tableau détaillé de toutes les administrations en dessous.
+- **Panneau de codage (à droite)** : rétractable via le bouton ◀/▶, et
+  défile indépendamment du reste de la page — la barre supérieure (recherche,
+  navigation patient, bandeau des séjours) reste toujours visible.
+- **Navigation** : l'onglet ouvert (Résumé/Parcours/Documents/…) et la
+  position de la barre des séjours sont conservés en changeant de séjour ou
+  de patient.
+
 ## API exposée par le backend (`main.py`)
 
 | Route                              | Rôle                                                         |
@@ -54,8 +92,12 @@ gestion des clics) est inchangé.
 ## Architecture des données (identique à la logique demandée)
 
 ### Excel (lecture seule) dans `data/`
-`patients`, `sejours`, `parcours`, `documents`, `constantes`, `biologie`,
-`medicaments`, `codes_valides`, `suggestions` — un fichier `.xlsx` par table.
+`patients`, `sejours`, `parcours`, `documents`, `fiches`, `observations`,
+`constantes`, `biologie`, `medicaments`, `administrations`, `codes_valides`,
+`suggestions` — un fichier `.xlsx` par table. `fiches` a une ligne par champ
+de formulaire (regroupées par `fiche_id`) et `administrations` une ligne par
+prise de médicament effective (générée automatiquement à partir de la
+fréquence de chaque médicament — voir `generate_sample_data.py`).
 `generate_sample_data.py` reprend les données fictives de votre prototype ;
 remplacez-le par votre export réel en gardant les mêmes colonnes.
 

@@ -10,12 +10,18 @@ Tables produites dans data/ :
     sejours.xlsx
     parcours.xlsx
     documents.xlsx
+    fiches.xlsx           (fiches de liaison/suivi remplies, une ligne par champ)
+    observations.xlsx     (observations médicales du patient)
     constantes.xlsx
     biologie.xlsx
     medicaments.xlsx
+    administrations.xlsx  (prises effectives de chaque médicament, une ligne par prise)
     codes_valides.xlsx   (codage déjà posé par le clinicien, référence)
     suggestions.xlsx     (suggestions de codage à valider/rejeter/modifier)
 """
+import re
+from datetime import date, timedelta
+
 import pandas as pd
 from pathlib import Path
 
@@ -40,18 +46,42 @@ PATIENTS = {
                     ("pe6", "2024-05-14", "10:00", "Sortie", "Retour à domicile avec HAD", "Sortie avec surveillance infirmière à domicile.", "Cardiologie", "Dr Martin"),
                 ],
                 "documents": [
-                    ("doc1", "2024-05-14", "Compte-rendu d'hospitalisation", "CRH — Séjour Cardiologie", "Dr Martin",
+                    ("doc1", "2024-05-14", "Compte-rendu d'hospitalisation", "CRH — Séjour Cardiologie", "Dr Martin", "UF Cardiologie",
                      "Patiente admise pour décompensation cardiaque globale sur cardiopathie ischémique connue, avec insuffisance rénale aiguë sur chronique stade IIIB. Évolution favorable sous traitement diurétique IV.",
                      "Patiente admise pour décompensation cardiaque globale sur cardiopathie ischémique connue, avec insuffisance rénale aiguë sur chronique stade IIIB. Évolution favorable sous traitement diurétique IV. Le bilan biologique d'entrée retrouvait un NT-proBNP à 5400 ng/L et une créatininémie à 142 µmol/L. L'échocardiographie a confirmé une dysfonction ventriculaire gauche sévère (FEVG 30%). Traitement diurétique intraveineux avec surveillance stricte de la diurèse, permettant une amélioration clinique et biologique progressive. Sortie à domicile avec majoration du traitement de fond et mise en place d'une hospitalisation à domicile (HAD).",
                      "cardiopathie ischémique"),
-                    ("doc2", "2024-05-03", "Compte-rendu d'examen", "Échographie cardiaque transthoracique", "Dr Bianchi",
+                    ("doc2", "2024-05-03", "Compte-rendu d'examen", "Échographie cardiaque transthoracique", "Dr Bianchi", "UF Imagerie cardiaque",
                      "FEVG estimée à 30%, hypokinésie globale. Pas d'épanchement péricardique. Valves sans anomalie significative.",
                      "FEVG estimée à 30%, hypokinésie globale. Pas d'épanchement péricardique. Valves sans anomalie significative. Cinétique globale altérée de façon homogène, sans anomalie segmentaire focale évocatrice d'une séquelle territoriale univoque. Fonction diastolique non évaluable de façon fiable dans ce contexte.",
                      "FEVG estimée à 30%"),
-                    ("doc4", "2024-05-08", "Compte-rendu de consultation", "Consultation cardiologie de suivi", "Dr Martin",
+                    ("doc4", "2024-05-08", "Compte-rendu de consultation", "Consultation cardiologie de suivi", "Dr Martin", "UF Cardiologie",
                      "Poids stable à 68kg, auscultation pulmonaire libre. Poursuite du traitement, kaliémie basse à surveiller.",
                      "Poids stable à 68kg, auscultation pulmonaire libre. Poursuite du traitement, kaliémie basse à surveiller. Le traitement bêta-bloquant et l'IEC ont été maintenus à dose stable. Surveillance rapprochée du ionogramme prévue en ville dans les 15 jours compte tenu de la kaliémie basse.",
                      "kaliémie basse"),
+                ],
+                "fiches": [
+                    ("f1", "Fiche de liaison infirmière", "Liaison IDE", "2024-05-14", "IDE Roussel", "UF Cardiologie",
+                     "Aide partielle pour la toilette", [
+                        ("Autonomie", "Aide partielle pour la toilette, marche avec déambulateur"),
+                        ("Régime alimentaire", "Sans sel strict"),
+                        ("Allergies connues", "Aucune"),
+                        ("Personne à prévenir", "Fille — Mme Dubreuil, 06 12 34 56 78"),
+                        ("Dispositifs en place", "Voie veineuse périphérique ; sonde vésicale retirée le 12/05"),
+                    ]),
+                    ("f2", "Fiche de sortie HAD", "Sortie", "2024-05-14", "Dr Martin", "UF Cardiologie", "", [
+                        ("Structure d'aval", "Hospitalisation à domicile (HAD)"),
+                        ("Surveillance prévue", "Poids quotidien, diurèse, ionogramme à J3"),
+                        ("Traitement de sortie", "Furosémide 40mg 2x/j, Ramipril 5mg 1x/j"),
+                    ]),
+                ],
+                "observations": [
+                    ("o1", "2024-05-02", "Dr Aubert", "UF Cardiologie", "Clinique",
+                     "Dyspnée de repos avec orthopnée",
+                     "Dyspnée de repos avec orthopnée à l'admission, crépitants bilatéraux aux bases, œdèmes des membres inférieurs."),
+                    ("o2", "2024-05-08", "Dr Martin", "UF Cardiologie", "Fonctionnelle", "",
+                     "Amélioration nette de la dyspnée, périmètre de marche en progression, plus d'orthopnée."),
+                    ("o3", "2024-05-14", "Dr Martin", "UF Cardiologie", "Sociale", "",
+                     "Patiente vivant seule, aide à domicile déjà en place 2x/semaine ; fille disponible pour renfort ponctuel."),
                 ],
                 "constantes": [
                     ("02/05", 104, "158/94", "91%", "37.1°C", "72 kg"),
@@ -83,6 +113,10 @@ PATIENTS = {
                      "Acte identifié dans le parcours de soins le 05/05 (surveillance diurèse)."),
                     ("s4", "E87.6", "CIM-10", "Hypokaliémie", 55, "document", "doc4",
                      "Kaliémie à 3.2-3.4 mmol/L en biologie et mention « kaliémie basse à surveiller » dans le courrier de consultation."),
+                    ("s5", "Z74.1", "CIM-10", "Nécessité d'aide pour les soins personnels", 61, "fiche", "f1",
+                     "Aide partielle pour la toilette mentionnée dans la fiche de liaison infirmière."),
+                    ("s6", "R06.0", "CIM-10", "Dyspnée", 70, "observation", "o1",
+                     "Dyspnée de repos avec orthopnée décrite dans l'observation clinique d'entrée."),
                 ],
             },
             "sej0": {
@@ -95,7 +129,7 @@ PATIENTS = {
                     ("pe3", "2023-11-13", "10:00", "Sortie", "Retour à domicile", "Sortie sous double antiagrégation plaquettaire.", "Cardiologie", "Dr Martin"),
                 ],
                 "documents": [
-                    ("doc1", "2023-11-11", "Compte-rendu d'examen", "CR Coronarographie", "Dr Perrot",
+                    ("doc1", "2023-11-11", "Compte-rendu d'examen", "CR Coronarographie", "Dr Perrot", "UF Cardiologie interventionnelle",
                      "Sténose serrée de l'artère interventriculaire antérieure proximale, traitée par angioplastie et pose d'un stent actif.",
                      "Sténose serrée de l'artère interventriculaire antérieure proximale, traitée par angioplastie et pose d'un stent actif. Angioplastie réalisée avec succès par voie radiale droite, sans complication au point de ponction. Double antiagrégation plaquettaire instaurée pour une durée de 12 mois.",
                      "stent actif"),
@@ -138,14 +172,28 @@ PATIENTS = {
                     ("pe5", "2024-04-16", "10:00", "Sortie", "Retour à domicile", "Relais par antibiothérapie orale.", "Pneumologie", "Dr Nguyen"),
                 ],
                 "documents": [
-                    ("doc1", "2024-04-16", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie", "Dr Nguyen",
+                    ("doc1", "2024-04-16", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie", "Dr Nguyen", "UF Pneumologie",
                      "Pneumopathie basale droite d'allure bactérienne, syndrome inflammatoire biologique marqué à l'entrée. Évolution favorable sous antibiothérapie.",
                      "Pneumopathie basale droite d'allure bactérienne, syndrome inflammatoire biologique marqué à l'entrée. Évolution favorable sous antibiothérapie. Hémocultures négatives, antigénurie légionelle et pneumocoque négatives. Antibiothérapie probabiliste par amoxicilline-acide clavulanique avec relais oral à J5, bonne évolution clinique et biologique.",
                      "Pneumopathie basale droite"),
-                    ("doc2", "2024-04-10", "Compte-rendu de radiologie", "Radiographie thoracique", "Dr Roche",
+                    ("doc2", "2024-04-10", "Compte-rendu de radiologie", "Radiographie thoracique", "Dr Roche", "UF Imagerie",
                      "Foyer de condensation alvéolaire du lobe inférieur droit, sans épanchement pleural associé.",
                      "Foyer de condensation alvéolaire du lobe inférieur droit, sans épanchement pleural associé. Contrôle radiologique de sortie non réalisé, à prévoir à distance si persistance de symptômes.",
                      "foyer de condensation alvéolaire"),
+                ],
+                "fiches": [
+                    ("f1", "Fiche de surveillance respiratoire", "Surveillance", "2024-04-14", "IDE Blanchard", "UF Pneumologie",
+                     "expectorations en diminution", [
+                        ("Fréquence respiratoire", "18/min, régulière"),
+                        ("Oxygénothérapie", "Sevrage réalisé le 13/04"),
+                        ("Toux", "Productive, expectorations en diminution"),
+                    ]),
+                ],
+                "observations": [
+                    ("o1", "2024-04-10", "Dr Caron", "UF Pneumologie", "Clinique", "",
+                     "Fièvre à 39.2°C, toux productive, douleur basithoracique droite à l'admission."),
+                    ("o2", "2024-04-14", "Dr Nguyen", "UF Pneumologie", "Fonctionnelle", "",
+                     "Apyrexie depuis 48h, amélioration de la toux, reprise d'une activité normale."),
                 ],
                 "constantes": [
                     ("10/04", 112, "104/68", "92%", "39.2°C", "61 kg"),
@@ -164,6 +212,8 @@ PATIENTS = {
                 "suggestions": [
                     ("s1", "J18.1", "CIM-10", "Pneumopathie lobaire, sans précision", 80, "document", "doc2",
                      "Foyer de condensation alvéolaire lobaire décrit sur la radiographie thoracique."),
+                    ("s2", "R05", "CIM-10", "Toux", 50, "fiche", "f1",
+                     "Toux productive en diminution mentionnée dans la fiche de surveillance respiratoire."),
                 ],
             },
             "sej0": {
@@ -176,7 +226,7 @@ PATIENTS = {
                     ("pe3", "2023-03-09", "10:00", "Sortie", "Retour à domicile", "Relais antibiothérapie orale.", "Pneumologie", "Dr Nguyen"),
                 ],
                 "documents": [
-                    ("doc1", "2023-03-09", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie (2023)", "Dr Nguyen",
+                    ("doc1", "2023-03-09", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie (2023)", "Dr Nguyen", "UF Pneumologie",
                      "Pneumopathie basale gauche, évolution favorable sous antibiothérapie orale.",
                      "Pneumopathie basale gauche, évolution favorable sous antibiothérapie orale. Évolution rapidement favorable sous antibiothérapie orale d'emblée, sans nécessité d'oxygénothérapie.",
                      "Pneumopathie basale gauche"),
@@ -214,14 +264,26 @@ PATIENTS = {
                     ("pe5", "2024-06-07", "11:00", "Sortie", "Sortie vers centre de rééducation", "Transfert en SSR pour poursuite de la rééducation.", "Chirurgie orthopédique", "Dr Lefevre"),
                 ],
                 "documents": [
-                    ("doc1", "2024-06-01", "Compte-rendu opératoire", "CR Opératoire — PTH droite", "Dr Lefevre",
+                    ("doc1", "2024-06-01", "Compte-rendu opératoire", "CR Opératoire — PTH droite", "Dr Lefevre", "UF Bloc opératoire",
                      "Mise en place d'une prothèse totale de hanche non cimentée, voie postéro-externe, sans incident peropératoire. Pertes sanguines estimées à 250mL.",
                      "Mise en place d'une prothèse totale de hanche non cimentée, voie postéro-externe, sans incident peropératoire. Pertes sanguines estimées à 250mL. Intervention réalisée sous rachianesthésie, durée opératoire de 55 minutes. Aucune transfusion peropératoire nécessaire. Suites immédiates simples.",
                      "prothèse totale de hanche"),
-                    ("doc2", "2024-06-07", "Compte-rendu de sortie", "Lettre de sortie", "Dr Lefevre",
+                    ("doc2", "2024-06-07", "Compte-rendu de sortie", "Lettre de sortie", "Dr Lefevre", "UF Chirurgie orthopédique",
                      "Patient sortant avec appui partiel, traitement antalgique et anticoagulant préventif pendant 35 jours.",
                      "Patient sortant avec appui partiel, traitement antalgique et anticoagulant préventif pendant 35 jours. Consignes de rééducation transmises au centre de SSR, avec limitation de la flexion de hanche au-delà de 90° pendant 6 semaines.",
                      "anticoagulant préventif"),
+                ],
+                "fiches": [
+                    ("f1", "Fiche de suivi rééducation", "Rééducation", "2024-06-04", "Kinésithérapeute Ferry", "UF Rééducation", "", [
+                        ("Appui", "Partiel, avec cannes anglaises"),
+                        ("Amplitude articulaire hanche", "Flexion 70°, pas de limitation en rotation"),
+                        ("Douleur (EVA)", "3/10 au repos, 5/10 à la mobilisation"),
+                    ]),
+                ],
+                "observations": [
+                    ("o1", "2024-06-02", "Dr Lefevre", "UF Chirurgie orthopédique", "Clinique",
+                     "Douleur post-opératoire",
+                     "Douleur post-opératoire bien contrôlée, cicatrice propre et sèche, pas de signe inflammatoire."),
                 ],
                 "constantes": [
                     ("01/06", 82, "138/86", "96%", "37.4°C", "84 kg"),
@@ -243,6 +305,8 @@ PATIENTS = {
                      "Pose d'une prothèse totale de hanche mentionnée dans le compte-rendu opératoire."),
                     ("s2", "M16.1", "CIM-10", "Coxarthrose primaire, autre", 66, "parcours", "pe1",
                      "Hospitalisation programmée pour pose de prothèse de hanche, suggérant une coxarthrose sous-jacente."),
+                    ("s3", "R52", "CIM-10", "Douleur, non classée ailleurs", 58, "observation", "o1",
+                     "Douleur post-opératoire mentionnée dans l'observation clinique du 02/06."),
                 ],
             },
             "sej0": {
@@ -254,7 +318,7 @@ PATIENTS = {
                     ("pe2", "2024-05-15", "10:30", "Acte", "Radiographie du bassin", "Coxarthrose sévère droite confirmée.", "Imagerie", "Dr Roche"),
                 ],
                 "documents": [
-                    ("doc1", "2024-05-15", "Compte-rendu de consultation", "CR Consultation pré-opératoire", "Dr Lefevre",
+                    ("doc1", "2024-05-15", "Compte-rendu de consultation", "CR Consultation pré-opératoire", "Dr Lefevre", "UF Chirurgie orthopédique",
                      "Coxarthrose évoluée symptomatique, indication de prothèse totale de hanche retenue.",
                      "Coxarthrose évoluée symptomatique, indication de prothèse totale de hanche retenue. Bilan pré-anesthésique programmé, absence de contre-indication à l'intervention à ce stade.",
                      "prothèse totale de hanche"),
@@ -277,11 +341,52 @@ PATIENTS = {
 }
 
 
+DOSE_HOURS_BY_FREQUENCY = {
+    1: ["08:00"],
+    2: ["08:00", "20:00"],
+    3: ["08:00", "14:00", "20:00"],
+    4: ["08:00", "12:00", "16:00", "20:00"],
+}
+
+
+def _dose_hours(frequence):
+    """Déduit les heures de prise quotidiennes à partir d'une fréquence du type "2x/jour"."""
+    m = re.match(r"(\d+)x/jour", frequence)
+    n = int(m.group(1)) if m else 1
+    return DOSE_HOURS_BY_FREQUENCY.get(n, ["08:00"])
+
+
+def _clamp(d, lo, hi):
+    return max(lo, min(d, hi))
+
+
+def _daterange(start, end):
+    d0, d1 = date.fromisoformat(start), date.fromisoformat(end)
+    days = []
+    d = d0
+    while d <= d1:
+        days.append(d.isoformat())
+        d += timedelta(days=1)
+    return days
+
+
+def _generate_administrations(debut, fin, frequence, sejour_entree, sejour_sortie):
+    """Génère les prises effectives d'un médicament, bornées à la durée du séjour."""
+    start = _clamp(debut, sejour_entree, sejour_sortie)
+    end = _clamp(fin or sejour_sortie, sejour_entree, sejour_sortie)
+    if end < start:
+        return []
+    hours = _dose_hours(frequence)
+    return [(day, heure) for day in _daterange(start, end) for heure in hours]
+
+
 def build_tables():
     patients_rows, sejours_rows = [], []
     parcours_rows, documents_rows = [], []
+    fiches_rows, observations_rows = [], []
     constantes_rows, biologie_rows = [], []
-    medicaments_rows, codes_valides_rows, suggestions_rows = [], [], []
+    medicaments_rows, administrations_rows = [], []
+    codes_valides_rows, suggestions_rows = [], []
 
     for patient_id, p in PATIENTS.items():
         patients_rows.append({"patient_id": patient_id, "sexe": p["sexe"], "age": p["age"]})
@@ -302,11 +407,27 @@ def build_tables():
                     "detail": detail, "lieu": lieu, "acteur": acteur,
                 })
 
-            for (did, date, typ, titre, auteur, excerpt, full_text, highlight) in s["documents"]:
+            for (did, date, typ, titre, auteur, uf, excerpt, full_text, highlight) in s["documents"]:
                 documents_rows.append({
                     "patient_id": patient_id, "sejour_key": sejour_key, "doc_id": did,
-                    "date": date, "type": typ, "titre": titre, "auteur": auteur,
+                    "date": date, "type": typ, "titre": titre, "auteur": auteur, "uf": uf,
                     "excerpt": excerpt, "full_text": full_text, "highlight": highlight,
+                })
+
+            for (fid, titre, typ, date, auteur, uf, highlight, champs) in s.get("fiches", []):
+                for ordre, (label, valeur) in enumerate(champs):
+                    fiches_rows.append({
+                        "patient_id": patient_id, "sejour_key": sejour_key, "fiche_id": fid,
+                        "titre": titre, "type": typ, "date": date, "auteur": auteur, "uf": uf,
+                        "highlight": highlight, "champ_ordre": ordre,
+                        "champ_label": label, "champ_valeur": valeur,
+                    })
+
+            for (oid, date, auteur, uf, categorie, highlight, texte) in s.get("observations", []):
+                observations_rows.append({
+                    "patient_id": patient_id, "sejour_key": sejour_key, "observation_id": oid,
+                    "date": date, "auteur": auteur, "uf": uf, "categorie": categorie,
+                    "highlight": highlight, "texte": texte,
                 })
 
             for (date, fc, ta, spo2, temp, poids) in s["constantes"]:
@@ -329,6 +450,12 @@ def build_tables():
                     "indication": indication, "prescripteur": prescripteur,
                     "debut": debut, "fin": fin, "statut": statut,
                 })
+                for (admin_date, admin_heure) in _generate_administrations(
+                        debut, fin, freq, s["entree"], s["sortie"]):
+                    administrations_rows.append({
+                        "patient_id": patient_id, "sejour_key": sejour_key, "med_id": mid,
+                        "date": admin_date, "heure": admin_heure,
+                    })
 
             for (cid, code, typ, libelle, note_par, date, removed) in s["codes_valides"]:
                 codes_valides_rows.append({
@@ -349,9 +476,12 @@ def build_tables():
         "sejours": pd.DataFrame(sejours_rows),
         "parcours": pd.DataFrame(parcours_rows),
         "documents": pd.DataFrame(documents_rows),
+        "fiches": pd.DataFrame(fiches_rows),
+        "observations": pd.DataFrame(observations_rows),
         "constantes": pd.DataFrame(constantes_rows),
         "biologie": pd.DataFrame(biologie_rows),
         "medicaments": pd.DataFrame(medicaments_rows),
+        "administrations": pd.DataFrame(administrations_rows),
         "codes_valides": pd.DataFrame(codes_valides_rows),
         "suggestions": pd.DataFrame(suggestions_rows),
     }

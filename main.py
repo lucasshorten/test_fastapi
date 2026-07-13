@@ -20,8 +20,9 @@ import annotations_store as store
 DATA_DIR = Path(__file__).parent / "data"
 STATIC_DIR = Path(__file__).parent / "static"
 
-TABLE_NAMES = ["patients", "sejours", "parcours", "documents", "constantes",
-               "biologie", "medicaments", "codes_valides", "suggestions"]
+TABLE_NAMES = ["patients", "sejours", "parcours", "documents", "fiches", "observations",
+               "constantes", "biologie", "medicaments", "administrations",
+               "codes_valides", "suggestions"]
 TABLES = {n: pd.read_excel(DATA_DIR / f"{n}.xlsx") for n in TABLE_NAMES}
 
 app = FastAPI(title="Dossier patient — API")
@@ -64,9 +65,27 @@ def build_dossier(patient_id: str, user: str) -> dict:
         ]
         documents = [
             {"id": r["doc_id"], "date": r["date"], "type": r["type"], "titre": r["titre"],
-             "auteur": r["auteur"], "excerpt": r["excerpt"], "fullText": r["full_text"],
+             "auteur": r["auteur"], "uf": r["uf"], "excerpt": r["excerpt"], "fullText": r["full_text"],
              "highlight": r["highlight"]}
             for _, r in table_for("documents", patient_id, sk).iterrows()
+        ]
+        fiches = []
+        fiches_df = table_for("fiches", patient_id, sk)
+        for fid in fiches_df["fiche_id"].drop_duplicates():
+            frows = fiches_df[fiches_df["fiche_id"] == fid].sort_values("champ_ordre")
+            first = frows.iloc[0]
+            fiches.append({
+                "id": fid, "titre": first["titre"], "type": first["type"],
+                "date": first["date"], "auteur": first["auteur"], "uf": first["uf"],
+                "highlight": _none_if_nan(first["highlight"]) or "",
+                "champs": [{"label": r["champ_label"], "valeur": r["champ_valeur"]}
+                           for _, r in frows.iterrows()],
+            })
+        observations = [
+            {"id": r["observation_id"], "date": r["date"], "auteur": r["auteur"], "uf": r["uf"],
+             "categorie": r["categorie"], "highlight": _none_if_nan(r["highlight"]) or "",
+             "texte": r["texte"]}
+            for _, r in table_for("observations", patient_id, sk).iterrows()
         ]
         constantes = [
             {"date": r["date"], "fc": int(r["fc"]), "ta": r["ta"], "spo2": r["spo2"],
@@ -85,6 +104,10 @@ def build_dossier(patient_id: str, user: str) -> dict:
              "prescripteur": r["prescripteur"], "debut": r["debut"],
              "fin": _none_if_nan(r["fin"]), "statut": r["statut"]}
             for _, r in table_for("medicaments", patient_id, sk).iterrows()
+        ]
+        administrations = [
+            {"medId": r["med_id"], "date": r["date"], "heure": r["heure"]}
+            for _, r in table_for("administrations", patient_id, sk).iterrows()
         ]
 
         codes_valides = []
@@ -127,8 +150,9 @@ def build_dossier(patient_id: str, user: str) -> dict:
         sejours[sk] = {
             "idSejour": s["id_sejour"], "service": s["service"], "entree": s["entree"],
             "sortie": s["sortie"], "motif": s["motif"], "praticien": s["praticien"],
-            "parcours": parcours, "documents": documents, "constantes": constantes,
-            "biologie": biologie, "medicaments": medicaments,
+            "parcours": parcours, "documents": documents, "fiches": fiches, "observations": observations,
+            "constantes": constantes,
+            "biologie": biologie, "medicaments": medicaments, "administrations": administrations,
             "codesValides": codes_valides, "suggestions": suggestions,
         }
 
