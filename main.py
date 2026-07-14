@@ -222,7 +222,7 @@ def build_dossier(patient_id: str, user: str) -> dict:
                                  "libelle": libelle, "confiance": int(r["confiance"]),
                                  "source": {"kind": r["source_kind"], "id": r["source_id"]},
                                  "justification": r["justification"], "status": status,
-                                 "amended": amended})
+                                 "amended": amended, "regleId": _none_if_nan(r["regle_id"])})
 
         sejours[sk] = {
             "idSejour": s["id_sejour"], "service": s["service"], "entree": s["entree"],

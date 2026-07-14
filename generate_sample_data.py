@@ -106,17 +106,17 @@ PATIENTS = {
                 ],
                 "suggestions": [
                     ("s1", "I25.9", "CIM-10", "Cardiopathie ischémique chronique, sans précision", 92, "document", "doc1",
-                     "Le terme « cardiopathie ischémique » a été détecté dans le compte-rendu d'hospitalisation."),
+                     "Le terme « cardiopathie ischémique » a été détecté dans le compte-rendu d'hospitalisation.", "RG-04"),
                     ("s2", "N18.3", "CIM-10", "Maladie rénale chronique, stade 3", 78, "document", "doc1",
-                     "Mention de « insuffisance rénale aiguë sur chronique stade IIIB » dans le CRH, compatible avec un DFG mesuré à 32-44 mL/min."),
+                     "Mention de « insuffisance rénale aiguë sur chronique stade IIIB » dans le CRH, compatible avec un DFG mesuré à 32-44 mL/min.", "RG-06"),
                     ("s3", "JDLD001", "CCAM", "Pose d'une sonde vésicale à demeure", 85, "parcours", "pe4",
-                     "Acte identifié dans le parcours de soins le 05/05 (surveillance diurèse)."),
+                     "Acte identifié dans le parcours de soins le 05/05 (surveillance diurèse).", "RG-08"),
                     ("s4", "E87.6", "CIM-10", "Hypokaliémie", 55, "document", "doc4",
-                     "Kaliémie à 3.2-3.4 mmol/L en biologie et mention « kaliémie basse à surveiller » dans le courrier de consultation."),
+                     "Kaliémie à 3.2-3.4 mmol/L en biologie et mention « kaliémie basse à surveiller » dans le courrier de consultation.", "RG-07"),
                     ("s5", "Z74.1", "CIM-10", "Nécessité d'aide pour les soins personnels", 61, "fiche", "f1",
-                     "Aide partielle pour la toilette mentionnée dans la fiche de liaison infirmière."),
+                     "Aide partielle pour la toilette mentionnée dans la fiche de liaison infirmière.", "RG-10"),
                     ("s6", "R06.0", "CIM-10", "Dyspnée", 70, "observation", "o1",
-                     "Dyspnée de repos avec orthopnée décrite dans l'observation clinique d'entrée."),
+                     "Dyspnée de repos avec orthopnée décrite dans l'observation clinique d'entrée.", "RG-11"),
                 ],
             },
             "sej0": {
@@ -150,7 +150,7 @@ PATIENTS = {
                 ],
                 "suggestions": [
                     ("s1", "DDAF004", "CCAM", "Angioplastie coronaire avec pose d'endoprothèse", 89, "document", "doc1",
-                     "Pose d'un stent actif mentionnée dans le compte-rendu de coronarographie."),
+                     "Pose d'un stent actif mentionnée dans le compte-rendu de coronarographie.", "RG-09"),
                 ],
             },
         },
@@ -211,9 +211,9 @@ PATIENTS = {
                 ],
                 "suggestions": [
                     ("s1", "J18.1", "CIM-10", "Pneumopathie lobaire, sans précision", 80, "document", "doc2",
-                     "Foyer de condensation alvéolaire lobaire décrit sur la radiographie thoracique."),
+                     "Foyer de condensation alvéolaire lobaire décrit sur la radiographie thoracique.", "RG-09"),
                     ("s2", "R05", "CIM-10", "Toux", 50, "fiche", "f1",
-                     "Toux productive en diminution mentionnée dans la fiche de surveillance respiratoire."),
+                     "Toux productive en diminution mentionnée dans la fiche de surveillance respiratoire.", "RG-10"),
                 ],
             },
             "sej0": {
@@ -302,11 +302,11 @@ PATIENTS = {
                 ],
                 "suggestions": [
                     ("s1", "Z96.6", "CIM-10", "Présence d'implant articulaire", 88, "document", "doc1",
-                     "Pose d'une prothèse totale de hanche mentionnée dans le compte-rendu opératoire."),
+                     "Pose d'une prothèse totale de hanche mentionnée dans le compte-rendu opératoire.", "RG-09"),
                     ("s2", "M16.1", "CIM-10", "Coxarthrose primaire, autre", 66, "parcours", "pe1",
-                     "Hospitalisation programmée pour pose de prothèse de hanche, suggérant une coxarthrose sous-jacente."),
+                     "Hospitalisation programmée pour pose de prothèse de hanche, suggérant une coxarthrose sous-jacente.", "RG-09"),
                     ("s3", "R52", "CIM-10", "Douleur, non classée ailleurs", 58, "observation", "o1",
-                     "Douleur post-opératoire mentionnée dans l'observation clinique du 02/06."),
+                     "Douleur post-opératoire mentionnée dans l'observation clinique du 02/06.", "RG-11"),
                 ],
             },
             "sej0": {
@@ -333,7 +333,7 @@ PATIENTS = {
                 "codes_valides": [],
                 "suggestions": [
                     ("s1", "M16.1", "CIM-10", "Coxarthrose primaire, autre", 72, "document", "doc1",
-                     "Coxarthrose évoluée symptomatique mentionnée dans le compte-rendu de consultation."),
+                     "Coxarthrose évoluée symptomatique mentionnée dans le compte-rendu de consultation.", "RG-09"),
                 ],
             },
         },
@@ -464,11 +464,12 @@ def build_tables():
                     "note_par": note_par, "date": date, "removed": removed,
                 })
 
-            for (sid, code, typ, libelle, confiance, src_kind, src_id, justification) in s["suggestions"]:
+            for (sid, code, typ, libelle, confiance, src_kind, src_id, justification, regle_id) in s["suggestions"]:
                 suggestions_rows.append({
                     "patient_id": patient_id, "sejour_key": sejour_key, "suggestion_id": sid,
                     "code": code, "type": typ, "libelle": libelle, "confiance": confiance,
                     "source_kind": src_kind, "source_id": src_id, "justification": justification,
+                    "regle_id": regle_id,
                 })
 
     return {

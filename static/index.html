@@ -168,6 +168,13 @@
   .conf-mid { background: var(--orange-soft); color: var(--orange); }
   .conf-low { background: var(--red-soft); color: var(--red); }
 
+  .suggestion-rule-link {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft); border: none;
+    padding: 2px 7px; border-radius: 999px; cursor: pointer; flex-shrink: 0;
+  }
+  .suggestion-rule-link:hover { background: #dce8ff; }
+
   .btn { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
   .btn:hover { background: var(--gray-soft); }
   .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -289,7 +296,13 @@
   .rules-empty { grid-column: 1 / -1; color: var(--muted); font-size: 13px; text-align: center; padding: 30px 10px; }
 
   .rule-item { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: #fbfcfe; }
+  .rule-item.rule-item-focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .rule-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .rule-head-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .rule-id-tag {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--muted);
+    background: var(--gray-soft); padding: 2px 7px; border-radius: 999px; flex-shrink: 0;
+  }
   .rule-title { font-weight: 700; font-size: 13.5px; }
   .rule-category-tag {
     font-size: 10px; text-transform: uppercase; letter-spacing: .03em; font-weight: 700;
@@ -381,6 +394,7 @@ let rulesLoading = false;
 let rulesEditingId = null;
 let ruleCommentDrafts = {}; // { [ruleId]: brouillon de commentaire en cours }
 let rulesSearchQuery = "";
+let rulesFocusId = null; // dernière règle ouverte depuis une suggestion, mise en évidence dans la liste
 let documentsSubTab = "documents"; // "documents" | "fiches" | "observations"
 let openDocumentId = null;
 let openFicheId = null;
@@ -866,11 +880,22 @@ function renderTabPanel(tab) {
 /* ------------------------------------------------------------------ */
 /* Panneau de codage — brique commune, scopée au séjour ouvert          */
 /* ------------------------------------------------------------------ */
+function renderRuleBadge(regleId) {
+  if (!regleId) return "";
+  return `<button class="suggestion-rule-link" data-action="open-rule" data-id="${regleId}"
+    title="Voir la règle ${regleId} dans le dictionnaire">${regleId}</button>`;
+}
+
 function renderSuggestionCard(s) {
   if (s.status !== "pending") {
     return `<div class="suggestion-card" style="opacity:.55">
-      <div class="row1"><span class="code-line">${s.code}</span>
-      <span style="font-size:12px">${s.status === "validé" ? "✅ Validé" : "❌ Rejeté"}</span></div>
+      <div class="row1">
+        <span class="code-line">${s.code}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${renderRuleBadge(s.regleId)}
+          <span style="font-size:12px">${s.status === "validé" ? "✅ Validé" : "❌ Rejeté"}</span>
+        </div>
+      </div>
       <div class="lib">${s.libelle}</div>
       <button class="btn btn-ghost" data-action="undo-suggestion" data-id="${s.id}">Annuler</button>
     </div>`;
@@ -891,7 +916,10 @@ function renderSuggestionCard(s) {
   return `<div class="suggestion-card">
     <div class="row1">
       <span class="code-line">${s.code}</span>
-      <span class="confidence-badge ${confClass(s.confiance)}">${s.confiance}%</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${renderRuleBadge(s.regleId)}
+        <span class="confidence-badge ${confClass(s.confiance)}">${s.confiance}%</span>
+      </div>
     </div>
     <div class="lib">${s.libelle} <span style="color:var(--muted);font-size:11px">· ${s.type}</span></div>
     <button class="source-link" data-action="goto-source" data-kind="${s.source.kind}" data-id="${s.source.id}">📎 ${src.label}</button>
@@ -995,11 +1023,15 @@ function renderRuleLogic(logique) {
 function renderRuleItem(rule) {
   const editing = rulesEditingId === rule.id;
   const comments = rule.commentaires || [];
-  return `<div class="rule-item">
+  const focusClass = rule.id === rulesFocusId ? " rule-item-focus" : "";
+  return `<div class="rule-item${focusClass}" id="rule-anchor-${rule.id}">
     <div class="rule-head">
-      ${editing
-        ? `<input class="mini-input" id="rule-titre-${rule.id}" value="${rule.titre}" style="flex:1;font-weight:700;font-size:13.5px">`
-        : `<span class="rule-title">${rule.titre}</span>`}
+      <div class="rule-head-title">
+        <span class="rule-id-tag">${rule.id}</span>
+        ${editing
+          ? `<input class="mini-input" id="rule-titre-${rule.id}" value="${rule.titre}" style="flex:1;font-weight:700;font-size:13.5px">`
+          : `<span class="rule-title">${rule.titre}</span>`}
+      </div>
       <span class="rule-category-tag">${rule.categorie}</span>
     </div>
 
@@ -1043,7 +1075,7 @@ function renderRuleItem(rule) {
 function ruleMatchesSearch(rule, query) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return (rule.code || "").toLowerCase().includes(q);
+  return (rule.code || "").toLowerCase().includes(q) || (rule.id || "").toLowerCase().includes(q);
 }
 
 function renderRulesModal() {
@@ -1053,7 +1085,7 @@ function renderRulesModal() {
     ? `<p style="color:var(--muted);font-size:12.5px">Chargement…</p>`
     : filtered.length
       ? filtered.map(renderRuleItem).join("")
-      : `<p class="rules-empty">Aucune règle ne correspond au code « ${rulesSearchQuery.trim()} ».</p>`;
+      : `<p class="rules-empty">Aucune règle ne correspond à « ${rulesSearchQuery.trim()} ».</p>`;
   return `<div class="modal-backdrop" data-action="close-rules-modal">
     <div class="rules-modal-panel" data-action="noop">
       <div class="modal-header">
@@ -1065,7 +1097,7 @@ function renderRulesModal() {
         ou ajouter un commentaire est purement documentaire : ça ne met pas à jour les codes déjà suggérés.</p>
       <div class="rules-search-wrap">
         <span class="rsw-icon">🔎</span>
-        <input type="text" id="rules-search-input" placeholder="Rechercher un code (ex : E11, N18, I25.9)…"
+        <input type="text" id="rules-search-input" placeholder="Rechercher un code ou un identifiant (ex : E11, N18, RG-04)…"
           value="${rulesSearchQuery}" autocomplete="off">
         ${rulesSearchQuery ? `<button class="rsw-clear" data-action="clear-rules-search" title="Effacer">✕</button>` : ""}
       </div>
@@ -1302,6 +1334,19 @@ document.addEventListener("click", (ev) => {
 
   if (action === "open-rules-modal") {
     rulesModalOpen = true;
+    rulesFocusId = null;
+    if (rulesData === null && !rulesLoading) {
+      rulesLoading = true;
+      render();
+      fetchRules().then(data => { rulesData = data; rulesLoading = false; render(); });
+      return;
+    }
+    return render();
+  }
+  if (action === "open-rule") {
+    rulesModalOpen = true;
+    rulesFocusId = id;
+    rulesSearchQuery = id;
     if (rulesData === null && !rulesLoading) {
       rulesLoading = true;
       render();
@@ -1311,11 +1356,12 @@ document.addEventListener("click", (ev) => {
     return render();
   }
   if (action === "close-rules-modal") {
-    rulesModalOpen = false; rulesEditingId = null; rulesSearchQuery = "";
+    rulesModalOpen = false; rulesEditingId = null; rulesSearchQuery = ""; rulesFocusId = null;
     return render();
   }
   if (action === "clear-rules-search") {
     rulesSearchQuery = "";
+    rulesFocusId = null;
     render();
     const inp = document.getElementById("rules-search-input");
     if (inp) inp.focus();
@@ -1430,6 +1476,7 @@ document.addEventListener("input", (ev) => {
   }
   if (ev.target && ev.target.id === "rules-search-input") {
     rulesSearchQuery = ev.target.value;
+    rulesFocusId = null;
     render();
     const inp = document.getElementById("rules-search-input");
     if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }

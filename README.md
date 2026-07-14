@@ -324,12 +324,37 @@ défaut au premier accès s'il n'existe pas encore. Modifier une règle ou
 ajouter un commentaire est purement documentaire : ça ne change jamais les
 suggestions déjà générées pour les séjours en cours.
 
-Chaque règle est rattachée à un ou plusieurs codes (CIM-10/CCAM) exprimés en
+Chaque règle a un identifiant stable (`RG-01`, `RG-02`...), affiché dans la
+pop-up, et rattaché à un ou plusieurs codes (CIM-10/CCAM) exprimés en
 logique factuelle « SI … ALORS … » (antécédents, codes ATC de médicament,
-regex sur le texte, seuils biologiques, actes du parcours). La pop-up
-propose une barre de recherche par code (ou fragment de code, ex. `N18`,
-`E11`) qui filtre la liste en direct, insensible à la casse — utile dès que
-le dictionnaire compte plus de quelques règles.
+regex sur le texte, seuils biologiques, actes du parcours, lexiques de
+mots-clés). La colonne `regle_id` de `suggestions.xlsx` relie chaque
+suggestion affichée dans le panneau de codage à la règle qui l'a produite :
+un badge `RG-xx` apparaît sur chaque carte de suggestion, cliquable pour
+ouvrir directement la pop-up sur cette règle (recherche pré-remplie,
+carte mise en évidence). La barre de recherche de la pop-up filtre par code
+**ou** par identifiant (ex. `N18`, `E11`, `RG-04`), en direct et insensible
+à la casse.
+
+Au-delà du champ `logique` (texte pour l'humain), chaque règle porte un
+champ `parametres` : une liste de conditions structurées
+`{champ, operateur, valeur}` (ex. `{"champ": "biologie.dfg", "operateur":
+"lt", "valeur": 60}`) pensée pour qu'un script puisse les évaluer sans
+reparser du texte libre :
+
+```python
+import rules_store
+from pathlib import Path
+
+rules = rules_store.load_rules(Path("data"))
+for rule in rules:
+    for cond in rule["parametres"]:
+        ...  # dispatcher sur cond["operateur"] : regex / lt / startswith / wordlist / ...
+```
+
+Ce n'est pas un moteur de règles branché sur la génération des suggestions
+(volontairement — voir plus haut), juste un format prêt à être consommé par
+un futur script d'automatisation.
 
 ## Limites assumées
 
