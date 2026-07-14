@@ -1,0 +1,124 @@
+rules:
+- id: antecedent-code-valide
+  titre: Antécédent codé lors d'un séjour précédent
+  categorie: Antécédent
+  logique: 'SI un code CIM-10 figure dans les codes validés d''un séjour antérieur
+    du même patient
+
+    ALORS reproposer ce même code pour le séjour en cours'
+  code: E11.9
+  libelle: Diabète de type 2, sans complication (exemple)
+  type: CIM-10
+  description: 'Un diagnostic chronique déjà validé par un clinicien lors d''un séjour
+    précédent (diabète, insuffisance cardiaque, coronaropathie...) reste pertinent
+    : on le repropose pour le séjour en cours. Exemple concret : si E11.x a été validé
+    lors d''un séjour antérieur, le patient a été diabétique — on peut le recoder
+    comme tel, sous réserve de confirmation par le relecteur.'
+  commentaires: []
+- id: atc-insuline
+  titre: Insulinothérapie pendant le séjour
+  categorie: Médicament
+  logique: 'SI un médicament administré a un code ATC commençant par A10 (insulines
+    et analogues)
+
+    ALORS suggérer E11.9'
+  code: E11.9
+  libelle: Diabète de type 2, sans complication
+  type: CIM-10
+  description: La prescription d'insuline pendant le séjour est un signal fort de
+    diabète, même si le diagnostic n'a été formulé dans aucun compte-rendu. Le code
+    ATC du médicament (pas seulement son nom commercial) est utilisé pour rester robuste
+    aux génériques.
+  commentaires: []
+- id: atc-double-antiagregation
+  titre: Double antiagrégation après pose de stent
+  categorie: Médicament
+  logique: 'SI médicament ATC B01AC (clopidogrel, ticagrélor...) prescrit en association
+    avec l''aspirine
+
+    ET un acte de pose d''endoprothèse coronaire figure dans le parcours
+
+    ALORS suggérer Z95.5'
+  code: Z95.5
+  libelle: Présence d'un implant et d'une greffe cardiaques et vasculaires — endoprothèse
+    coronaire
+  type: CIM-10
+  description: 'La combinaison des deux antiagrégants plaquettaires est le traitement
+    standard après pose de stent : la détecter en même temps que l''acte de pose confirme
+    la présence de l''implant, utile même longtemps après l''intervention initiale.'
+  commentaires: []
+- id: motcle-cardiopathie-ischemique
+  titre: Mention de cardiopathie ischémique
+  categorie: Mots-clés
+  logique: 'SI un document du séjour matche la regex
+
+    /cardiopath(?:ie)?\s+isch[ée]miqu\w*/i
+
+    ALORS suggérer I25.9'
+  code: I25.9
+  libelle: Cardiopathie ischémique chronique, sans précision
+  type: CIM-10
+  description: 'Recherche l''expression sur le texte intégral des comptes-rendus (CRH,
+    consultations, imagerie...), variantes orthographiques incluses. Un simple mot-clé
+    exact serait trop rigide (« cardiopathies ischémiques », « cardiopathie ischémique
+    sévère »…) : la regex capture la racine du terme plutôt qu''une chaîne figée.'
+  commentaires: []
+- id: motcle-insuffisance-renale
+  titre: Insuffisance rénale, aiguë ou chronique
+  categorie: Mots-clés
+  logique: 'SI un document ou une observation matche la regex
+
+    /insuffisance\s+r[ée]nale\s+(aigu[eë]|chronique)/i
+
+    ALORS suggérer N17.9 si « aiguë » est détecté, sinon N18.9 si « chronique » est
+    détecté'
+  code: N17.9 / N18.9
+  libelle: Insuffisance rénale aiguë, SP / Maladie rénale chronique, SP
+  type: CIM-10
+  description: Le qualificatif capturé par la regex (aiguë vs chronique) détermine
+    directement quel code est suggéré — pas de suggestion générique « insuffisance
+    rénale » sans précision du caractère aigu/chronique.
+  commentaires: []
+- id: seuil-dfg
+  titre: DFG abaissé → maladie rénale chronique
+  categorie: Seuil biologique
+  logique: 'SI DFG < 30 mL/min ALORS suggérer N18.4
+
+    SI 30 ≤ DFG < 45 mL/min ALORS suggérer N18.3
+
+    SI 45 ≤ DFG < 60 mL/min ALORS suggérer N18.2'
+  code: N18.2 / N18.3 / N18.4
+  libelle: Maladie rénale chronique, stade 2 / 3 / 4 selon le DFG mesuré
+  type: CIM-10
+  description: 'Le stade suggéré dépend directement de la dernière valeur de DFG mesurée
+    dans le séjour. Une seule mesure abaissée ne confirme pas une maladie chronique
+    (elle peut être aiguë) : à confirmer par le relecteur au vu du contexte clinique.'
+  commentaires: []
+- id: seuil-kaliemie
+  titre: Hypokaliémie
+  categorie: Seuil biologique
+  logique: 'SI kaliémie < 3.5 mmol/L
+
+    ALORS suggérer E87.6'
+  code: E87.6
+  libelle: Hypokaliémie
+  type: CIM-10
+  description: Seuil biologique simple, sans condition supplémentaire. La confiance
+    de la suggestion augmente si une mention textuelle correspondante (« kaliémie
+    basse », « à surveiller »...) est aussi trouvée dans un compte-rendu du même séjour.
+  commentaires: []
+- id: acte-sonde-vesicale
+  titre: Pose de sonde vésicale à demeure
+  categorie: Acte
+  logique: 'SI l''intitulé d''un événement du parcours matche la regex
+
+    /sonde\s+v[ée]sicale|cath[ée]ter\s+urinaire/i
+
+    ALORS suggérer JDLD001'
+  code: JDLD001
+  libelle: Pose d'une sonde vésicale à demeure
+  type: CCAM
+  description: Détecte l'acte directement dans la chronologie du parcours de soins,
+    plutôt que dans un compte-rendu — utile pour les actes rarement détaillés dans
+    un document dédié.
+  commentaires: []

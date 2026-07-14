@@ -281,6 +281,9 @@ tables Excel / la même API :
 | `GET/POST /api/admin/users`         | lister / créer des comptes (admin uniquement)                   |
 | `PUT/DELETE /api/admin/users/{u}`   | modifier (mot de passe, rôle, affectations) / supprimer un compte (admin uniquement) |
 | `GET /api/admin/patients`           | liste des patients de l'instance, pour l'écran d'affectation (admin uniquement) |
+| `GET /api/rules`                    | dictionnaire des règles de détection des suggestions IA (partagé entre tous les comptes) |
+| `PUT /api/rules/{id}`               | modifier le titre/la description d'une règle                    |
+| `POST /api/rules/{id}/comments`     | ajouter un commentaire sur une règle                             |
 
 ## Architecture des données (identique à la logique demandée)
 
@@ -311,6 +314,22 @@ connecté avec un compte admin).
 ### YAML (comptes) dans `<instance>/.auth/credentials.yaml`
 Comptes, mots de passe hachés et patients affectés à chaque relecteur —
 voir la section « Comptes, authentification et affectations » ci-dessus.
+
+### YAML (règles IA) dans `<instance>/data/rules.yaml`
+Dictionnaire des règles/algorithmes de détection utilisés pour générer les
+suggestions de codage, accessible via le bouton « ℹ️ Règles » à côté de
+« Suggestion » dans le panneau de codage. Partagé entre tous les comptes de
+l'instance (contrairement aux annotations), généré avec des règles par
+défaut au premier accès s'il n'existe pas encore. Modifier une règle ou
+ajouter un commentaire est purement documentaire : ça ne change jamais les
+suggestions déjà générées pour les séjours en cours.
+
+Chaque règle est rattachée à un ou plusieurs codes (CIM-10/CCAM) exprimés en
+logique factuelle « SI … ALORS … » (antécédents, codes ATC de médicament,
+regex sur le texte, seuils biologiques, actes du parcours). La pop-up
+propose une barre de recherche par code (ou fragment de code, ex. `N18`,
+`E11`) qui filtre la liste en direct, insensible à la casse — utile dès que
+le dictionnaire compte plus de quelques règles.
 
 ## Limites assumées
 

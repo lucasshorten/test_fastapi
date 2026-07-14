@@ -29,6 +29,7 @@ from pydantic import BaseModel
 
 import annotations_store as store
 import auth_store
+import rules_store
 
 INSTANCE_DIR = Path(os.environ.get("DOSSIER_INSTANCE_DIR", Path(__file__).parent))
 DATA_DIR = INSTANCE_DIR / "data"
@@ -277,6 +278,46 @@ def post_annotate(a: AnnotationIn, user: dict = Depends(current_user)):
 def export_all(admin: dict = Depends(require_admin)):
     df = store.load_all_annotations(DATA_DIR)
     return PlainTextResponse(df.to_csv(index=False), media_type="text/csv")
+
+
+# --------------------------------------------------------------- règles IA --
+# Dictionnaire des règles/algorithmes de détection : partagé entre tous les
+# comptes de l'instance (pas seulement les admins), purement documentaire —
+# le modifier n'affecte jamais les suggestions déjà générées.
+
+class RuleUpdateIn(BaseModel):
+    titre: str | None = None
+    logique: str | None = None
+    description: str | None = None
+
+
+class RuleCommentIn(BaseModel):
+    texte: str
+
+
+@app.get("/api/rules")
+def list_rules(user: dict = Depends(current_user)):
+    return rules_store.load_rules(DATA_DIR)
+
+
+@app.put("/api/rules/{rule_id}")
+def update_rule(rule_id: str, body: RuleUpdateIn, user: dict = Depends(current_user)):
+    try:
+        return rules_store.update_rule(DATA_DIR, rule_id, titre=body.titre, logique=body.logique,
+                                        description=body.description)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Règle introuvable")
+
+
+@app.post("/api/rules/{rule_id}/comments")
+def add_rule_comment(rule_id: str, body: RuleCommentIn, user: dict = Depends(current_user)):
+    texte = body.texte.strip()
+    if not texte:
+        raise HTTPException(status_code=400, detail="Commentaire vide")
+    try:
+        return rules_store.add_comment(DATA_DIR, rule_id, user["username"], texte)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Règle introuvable")
 
 
 # --------------------------------------------------------------------- admin --

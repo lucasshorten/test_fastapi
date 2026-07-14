@@ -242,6 +242,85 @@
   .add-code-form { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: #fbfcfe; }
   .add-code-form input.mini-input { width: 100%; }
 
+  /* ---------- section header + pop-up "règles de détection" ---------- */
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .section-head h3 { margin-bottom: 0; }
+  .rules-info-btn {
+    text-transform: none; letter-spacing: normal; font-size: 11px; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft); border: none; border-radius: 999px;
+    padding: 4px 10px; white-space: nowrap; flex-shrink: 0;
+  }
+  .rules-info-btn:hover { background: #dce8ff; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(16,24,32,.45); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .rules-modal-panel {
+    background: var(--panel); border-radius: 14px; box-shadow: var(--shadow-md);
+    width: 100%; max-width: 860px; max-height: min(860px, 92vh);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 24px 0; }
+  .modal-header h3 { font-size: 16.5px; text-transform: none; letter-spacing: normal; color: var(--text); }
+  .modal-close {
+    border: none; background: var(--gray-soft); color: var(--muted);
+    width: 28px; height: 28px; border-radius: 50%; font-size: 13px; flex-shrink: 0;
+  }
+  .modal-close:hover { background: #e2e6ea; color: var(--text); }
+  .modal-sub { padding: 8px 24px 14px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .rules-search-wrap { position: relative; margin: 0 24px 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .rules-search-wrap .rsw-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--muted); pointer-events: none; }
+  .rules-search-wrap input {
+    width: 100%; padding: 9px 34px; border-radius: 8px; border: 1px solid var(--border);
+    font-size: 13px; font-family: inherit; background: #fbfcfe;
+  }
+  .rules-search-wrap input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .rsw-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    border: none; background: var(--gray-soft); color: var(--muted);
+    width: 20px; height: 20px; border-radius: 50%; font-size: 10px; cursor: pointer;
+  }
+  .rsw-clear:hover { background: #e2e6ea; color: var(--text); }
+  .modal-body {
+    padding: 0 24px 24px; overflow-y: auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-content: start;
+  }
+  .rules-empty { grid-column: 1 / -1; color: var(--muted); font-size: 13px; text-align: center; padding: 30px 10px; }
+
+  .rule-item { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: #fbfcfe; }
+  .rule-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .rule-title { font-weight: 700; font-size: 13.5px; }
+  .rule-category-tag {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .03em; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+  }
+  .rule-logic-box {
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: #1c2b36;
+    background: var(--gray-soft); border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 9px 11px; margin-bottom: 10px; white-space: pre-wrap;
+  }
+  .rule-logic-box strong { color: var(--accent); }
+  textarea.rule-logic-input {
+    width: 100%; min-height: 64px; margin-bottom: 4px; font-family: var(--mono); font-size: 11.5px;
+    line-height: 1.6; resize: vertical;
+  }
+  .rule-result { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .rule-result-lib { font-size: 12px; color: var(--muted); }
+  .field-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin: 8px 0 4px; }
+  .rule-desc { font-size: 12.5px; color: #33424d; line-height: 1.55; margin-bottom: 8px; white-space: pre-wrap; }
+  textarea.rule-desc-input { width: 100%; min-height: 68px; font-family: inherit; font-size: 12.5px; resize: vertical; }
+  .rule-edit-trigger { font-size: 11.5px; }
+  .rule-comments { border-top: 1px dashed var(--border); margin-top: 10px; padding-top: 8px; }
+  .rule-comment { font-size: 12px; margin-bottom: 8px; }
+  .rule-comment .rc-meta { color: var(--muted); font-size: 10.5px; margin-bottom: 1px; }
+  .rule-comment-empty { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; }
+  .rule-comment-form { display: flex; gap: 6px; margin-top: 8px; align-items: flex-start; }
+  .rule-comment-form textarea {
+    flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    font-size: 12px; font-family: inherit; resize: vertical; min-height: 34px;
+  }
+
   .chat-panel { display: flex; flex-direction: column; height: calc(100vh - 300px); min-height: 260px; }
   .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 10px; }
   .chat-msg { max-width: 92%; padding: 9px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.5; }
@@ -296,6 +375,12 @@ let searchState = { query: "", open: false };
 let contentSearch = { query: "", open: false, scope: "sejour" };
 let sidePanelTab = "codage"; // "codage" | "chatbot"
 let sidePanelCollapsed = false;
+let rulesModalOpen = false;
+let rulesData = null;      // null = pas encore chargé (chargement à la première ouverture)
+let rulesLoading = false;
+let rulesEditingId = null;
+let ruleCommentDrafts = {}; // { [ruleId]: brouillon de commentaire en cours }
+let rulesSearchQuery = "";
 let documentsSubTab = "documents"; // "documents" | "fiches" | "observations"
 let openDocumentId = null;
 let openFicheId = null;
@@ -863,7 +948,10 @@ function renderCodagePanel() {
       ${renderAddCodeForm()}
     </section>
     <section>
-      <h3>Suggestions IA (${sejour().suggestions.filter(s=>s.status==='pending').length} en attente)</h3>
+      <div class="section-head">
+        <h3>Suggestion (${sejour().suggestions.filter(s=>s.status==='pending').length} en attente)</h3>
+        <button class="rules-info-btn" data-action="open-rules-modal" title="Voir les règles et algorithmes de détection">ℹ️ Règles</button>
+      </div>
       ${sejour().suggestions.map(renderSuggestionCard).join("") || `<p style="color:var(--muted);font-size:12.5px">Aucune suggestion pour ce séjour.</p>`}
     </section>`;
 }
@@ -893,6 +981,97 @@ function renderSidePanelTabs() {
 
 function renderRightPanel() {
   return `${renderSidePanelTabs()}${sidePanelTab === "codage" ? renderCodagePanel() : renderChatPanel()}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pop-up "Règles de détection" — dictionnaire partagé entre relecteurs, */
+/* purement documentaire (aucun lien avec la génération des suggestions). */
+/* ------------------------------------------------------------------ */
+function renderRuleLogic(logique) {
+  const html = (logique || "").replace(/^(SI|ALORS|ET|OU)\b/gm, "<strong>$1</strong>");
+  return `<div class="rule-logic-box">${html}</div>`;
+}
+
+function renderRuleItem(rule) {
+  const editing = rulesEditingId === rule.id;
+  const comments = rule.commentaires || [];
+  return `<div class="rule-item">
+    <div class="rule-head">
+      ${editing
+        ? `<input class="mini-input" id="rule-titre-${rule.id}" value="${rule.titre}" style="flex:1;font-weight:700;font-size:13.5px">`
+        : `<span class="rule-title">${rule.titre}</span>`}
+      <span class="rule-category-tag">${rule.categorie}</span>
+    </div>
+
+    ${editing ? `<div class="field-label">Logique (si / alors)</div>` : ""}
+    ${editing
+      ? `<textarea class="rule-logic-input" id="rule-logique-${rule.id}">${rule.logique}</textarea>`
+      : renderRuleLogic(rule.logique)}
+
+    <div class="rule-result">
+      <span class="code-chip type-${rule.type}"><span class="code">${rule.code}</span></span>
+      <span class="rule-result-lib">${rule.libelle}</span>
+    </div>
+
+    ${editing ? `
+      <div class="field-label">Explication pour le relecteur</div>
+      <textarea class="rule-desc-input" id="rule-desc-${rule.id}">${rule.description}</textarea>
+      <div class="actions-row">
+        <button class="btn btn-primary" data-action="save-rule-edit" data-id="${rule.id}">Enregistrer</button>
+        <button class="btn" data-action="cancel-edit-rule" data-id="${rule.id}">Annuler</button>
+      </div>` : `
+      <div class="rule-desc">${rule.description}</div>
+      <button class="btn-ghost rule-edit-trigger" data-action="edit-rule" data-id="${rule.id}">✎ Modifier</button>`}
+
+    <div class="rule-comments">
+      ${comments.length
+        ? comments.map(c => `
+          <div class="rule-comment">
+            <div class="rc-meta">${c.auteur} · ${formatDateFr(c.date.slice(0,10))}</div>
+            <div>${c.texte}</div>
+          </div>`).join("")
+        : `<div class="rule-comment-empty">Aucun commentaire pour l'instant.</div>`}
+      <div class="rule-comment-form">
+        <textarea class="rule-comment-textarea" id="rule-comment-input-${rule.id}" data-rule-id="${rule.id}"
+          placeholder="Ajouter un commentaire sur cette règle…">${ruleCommentDrafts[rule.id] || ""}</textarea>
+        <button class="btn btn-primary" data-action="add-rule-comment" data-id="${rule.id}">Ajouter</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function ruleMatchesSearch(rule, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (rule.code || "").toLowerCase().includes(q);
+}
+
+function renderRulesModal() {
+  if (!rulesModalOpen) return "";
+  const filtered = (rulesData || []).filter(r => ruleMatchesSearch(r, rulesSearchQuery));
+  const body = rulesLoading
+    ? `<p style="color:var(--muted);font-size:12.5px">Chargement…</p>`
+    : filtered.length
+      ? filtered.map(renderRuleItem).join("")
+      : `<p class="rules-empty">Aucune règle ne correspond au code « ${rulesSearchQuery.trim()} ».</p>`;
+  return `<div class="modal-backdrop" data-action="close-rules-modal">
+    <div class="rules-modal-panel" data-action="noop">
+      <div class="modal-header">
+        <h3>🧠 Règles de détection des suggestions</h3>
+        <button class="modal-close" data-action="close-rules-modal" title="Fermer">✕</button>
+      </div>
+      <p class="modal-sub">Dictionnaire partagé entre tous les relecteurs de cette instance : logique et
+        mots-clés utilisés pour proposer chaque code, en langage factuel et vérifiable. Modifier une règle
+        ou ajouter un commentaire est purement documentaire : ça ne met pas à jour les codes déjà suggérés.</p>
+      <div class="rules-search-wrap">
+        <span class="rsw-icon">🔎</span>
+        <input type="text" id="rules-search-input" placeholder="Rechercher un code (ex : E11, N18, I25.9)…"
+          value="${rulesSearchQuery}" autocomplete="off">
+        ${rulesSearchQuery ? `<button class="rsw-clear" data-action="clear-rules-search" title="Effacer">✕</button>` : ""}
+      </div>
+      <div class="modal-body">${body}</div>
+    </div>
+  </div>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -996,7 +1175,8 @@ function cyclePatient(dir) {
 function render() {
   const prevBar = document.querySelector(".sejours-bar");
   const scrollLeft = prevBar ? prevBar.scrollLeft : 0;
-  document.getElementById("app").innerHTML = renderTopBar() + renderSejoursBar() + renderVariantI();
+  document.getElementById("app").innerHTML =
+    renderTopBar() + renderSejoursBar() + renderVariantI() + renderRulesModal();
   const newBar = document.querySelector(".sejours-bar");
   if (newBar) newBar.scrollLeft = scrollLeft;
 }
@@ -1120,6 +1300,62 @@ document.addEventListener("click", (ev) => {
   if (action === "toggle-side-panel") { sidePanelCollapsed = !sidePanelCollapsed; return render(); }
   if (action === "set-documents-subtab") { documentsSubTab = el.dataset.tab; return render(); }
 
+  if (action === "open-rules-modal") {
+    rulesModalOpen = true;
+    if (rulesData === null && !rulesLoading) {
+      rulesLoading = true;
+      render();
+      fetchRules().then(data => { rulesData = data; rulesLoading = false; render(); });
+      return;
+    }
+    return render();
+  }
+  if (action === "close-rules-modal") {
+    rulesModalOpen = false; rulesEditingId = null; rulesSearchQuery = "";
+    return render();
+  }
+  if (action === "clear-rules-search") {
+    rulesSearchQuery = "";
+    render();
+    const inp = document.getElementById("rules-search-input");
+    if (inp) inp.focus();
+    return;
+  }
+  if (action === "edit-rule") { rulesEditingId = id; return render(); }
+  if (action === "cancel-edit-rule") { rulesEditingId = null; return render(); }
+  if (action === "save-rule-edit") {
+    const titre = document.getElementById(`rule-titre-${id}`).value.trim();
+    const logique = document.getElementById(`rule-logique-${id}`).value.trim();
+    const description = document.getElementById(`rule-desc-${id}`).value.trim();
+    const rule = rulesData.find(r => r.id === id);
+    if (rule) { rule.titre = titre; rule.logique = logique; rule.description = description; }
+    rulesEditingId = null;
+    fetch(`/api/rules/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titre, logique, description }),
+    }).catch(err => console.error("Échec de mise à jour de la règle :", err));
+    return render();
+  }
+  if (action === "add-rule-comment") {
+    const texte = (ruleCommentDrafts[id] || "").trim();
+    if (!texte) return;
+    ruleCommentDrafts[id] = "";
+    fetch(`/api/rules/${encodeURIComponent(id)}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texte }),
+    })
+      .then(res => res.json())
+      .then(comment => {
+        const rule = rulesData.find(r => r.id === id);
+        if (rule) { rule.commentaires = rule.commentaires || []; rule.commentaires.push(comment); }
+        render();
+      })
+      .catch(err => console.error("Échec d'ajout du commentaire :", err));
+    return render();
+  }
+
   if (action === "toggle-accordion") {
     const kind = el.dataset.kind;
     const oid = el.dataset.id;
@@ -1189,6 +1425,15 @@ document.addEventListener("input", (ev) => {
   if (ev.target && ev.target.id === "chat-input") {
     chatDraft = ev.target.value;
   }
+  if (ev.target && ev.target.classList && ev.target.classList.contains("rule-comment-textarea")) {
+    ruleCommentDrafts[ev.target.dataset.ruleId] = ev.target.value;
+  }
+  if (ev.target && ev.target.id === "rules-search-input") {
+    rulesSearchQuery = ev.target.value;
+    render();
+    const inp = document.getElementById("rules-search-input");
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
 });
 
 document.addEventListener("keydown", (ev) => {
@@ -1196,6 +1441,11 @@ document.addEventListener("keydown", (ev) => {
     ev.preventDefault();
     const sendBtn = document.querySelector('[data-action="send-chat"]');
     if (sendBtn) sendBtn.click();
+  }
+  if (ev.key === "Escape" && rulesModalOpen) {
+    rulesModalOpen = false;
+    rulesEditingId = null;
+    render();
   }
 });
 
@@ -1211,6 +1461,10 @@ async function fetchPatientList() {
 async function fetchDossier(patientId) {
   const res = await fetch(`/api/dossier/${encodeURIComponent(patientId)}`);
   return res.json();
+}
+async function fetchRules() {
+  const res = await fetch("/api/rules");
+  return res.ok ? res.json() : [];
 }
 function postAnnotation(payload) {
   fetch("/api/annotate", {
