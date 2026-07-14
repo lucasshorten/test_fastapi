@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration — Dossier patient</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #dfe4e8;
+    --text: #1c2b36;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-soft: #eaf1ff;
+    --green: #16a34a;
+    --green-soft: #eafaf0;
+    --red: #dc2626;
+    --red-soft: #fdecec;
+    --shadow-sm: 0 1px 2px rgba(16,24,32,.06);
+    --shadow-md: 0 8px 24px rgba(16,24,32,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; background: #1c2b36; color: #fff;
+  }
+  .topbar a { color: #fff; text-decoration: none; opacity: .85; font-size: 13px; }
+  .topbar a:hover { opacity: 1; }
+  .topbar-title { font-weight: 700; font-size: 15px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  .topbar-right button {
+    background: rgba(255,255,255,.12); color: #fff; border: none;
+    padding: 6px 12px; border-radius: 6px; font-size: 12.5px;
+  }
+  .topbar-right button:hover { background: rgba(255,255,255,.22); }
+
+  main { max-width: 920px; margin: 28px auto; padding: 0 20px 60px; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow-sm); padding: 20px 22px; margin-bottom: 20px;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+  }
+  .panel-head h2 { margin: 0; font-size: 15px; }
+  .btn {
+    border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+  }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-accent:hover { background: #1d4fc4; }
+  .btn-ghost { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: #eceff2; }
+  .btn-danger { background: var(--red-soft); color: var(--red); }
+  .btn-danger:hover { background: #f9d5d3; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.actions { display: flex; gap: 6px; justify-content: flex-end; }
+  tr:last-child td { border-bottom: none; }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  }
+  .pill-admin { background: var(--accent-soft); color: var(--accent); }
+  .pill-user { background: var(--green-soft); color: var(--green); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  input[type=text], input[type=password], select {
+    width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border);
+    font-family: inherit; font-size: 13.5px; background: #fbfcfd;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+
+  .patient-picker {
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    max-height: 220px; overflow-y: auto; background: #fbfcfd;
+  }
+  .patient-picker label {
+    display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--text);
+    font-size: 13px; padding: 4px 2px; margin: 0; cursor: pointer;
+  }
+  .patient-picker input[type=checkbox] { width: auto; }
+  .patient-picker .empty { color: var(--muted); font-size: 12.5px; padding: 6px 2px; }
+
+  .form-actions { display: flex; gap: 10px; margin-top: 18px; }
+  #form-panel { display: none; }
+  #form-error {
+    display: none; margin-top: 12px; padding: 9px 12px; border-radius: 7px;
+    background: var(--red-soft); color: var(--red); font-size: 13px;
+  }
+  #form-error.visible { display: block; }
+  .loading, .empty-state { color: var(--muted); font-size: 13px; padding: 10px 2px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-title">Administration — comptes &amp; affectations</div>
+    <div class="topbar-right">
+      <a href="/">← Retour au dossier patient</a>
+      <span id="whoami"></span>
+      <button id="logout-btn">Déconnexion</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="panel" id="form-panel">
+      <div class="panel-head">
+        <h2 id="form-title">Nouveau compte</h2>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label for="f-username">Identifiant</label>
+          <input type="text" id="f-username" placeholder="ex : dr.martin">
+        </div>
+        <div>
+          <label for="f-role">Rôle</label>
+          <select id="f-role">
+            <option value="user">Relecteur — voit uniquement ses patients affectés</option>
+            <option value="admin">Administrateur — voit tous les patients, gère les comptes</option>
+          </select>
+        </div>
+        <div>
+          <label for="f-password">Mot de passe</label>
+          <input type="password" id="f-password" placeholder="">
+          <div class="hint" id="password-hint">Minimum 8 caractères.</div>
+        </div>
+        <div class="full">
+          <label>Patients affectés <span id="patient-count-hint" class="hint"></span></label>
+          <input type="text" id="patient-filter" placeholder="Filtrer par identifiant…" style="margin-bottom:8px;">
+          <div class="patient-picker" id="patient-picker"></div>
+        </div>
+      </div>
+      <div id="form-error"></div>
+      <div class="form-actions">
+        <button class="btn btn-accent" id="save-btn">Enregistrer</button>
+        <button class="btn btn-ghost" id="cancel-btn">Annuler</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Comptes</h2>
+        <button class="btn btn-accent" id="new-user-btn">+ Nouveau compte</button>
+      </div>
+      <div id="users-table-wrap">
+        <div class="loading">Chargement…</div>
+      </div>
+    </div>
+  </main>
+
+<script>
+let ALL_PATIENTS = [];
+let editingUsername = null; // null = création
+
+async function requireAdmin() {
+  const res = await fetch("/api/me", { credentials: "same-origin" });
+  if (!res.ok) { window.location.href = "/login.html"; return null; }
+  const me = await res.json();
+  if (me.role !== "admin") { window.location.href = "/"; return null; }
+  document.getElementById("whoami").textContent = me.username;
+  return me;
+}
+
+async function loadPatients() {
+  const res = await fetch("/api/admin/patients", { credentials: "same-origin" });
+  ALL_PATIENTS = res.ok ? await res.json() : [];
+}
+
+function renderPatientPicker(selectedIds, filterText) {
+  const wrap = document.getElementById("patient-picker");
+  const q = (filterText || "").trim().toLowerCase();
+  const list = ALL_PATIENTS.filter(p => !q || p.id.toLowerCase().includes(q));
+  if (list.length === 0) {
+    wrap.innerHTML = `<div class="empty">Aucun patient ne correspond.</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(p => `
+    <label>
+      <input type="checkbox" value="${p.id}" ${selectedIds.has(p.id) ? "checked" : ""}>
+      ${p.id} <span style="color:var(--muted)">(${p.sexe}, ${p.age} ans)</span>
+    </label>
+  `).join("");
+  updatePatientCountHint();
+  wrap.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedIds.add(cb.value); else selectedIds.delete(cb.value);
+      updatePatientCountHint(selectedIds);
+    });
+  });
+}
+
+function updatePatientCountHint(selectedIds) {
+  const wrap = document.getElementById("patient-picker");
+  const n = selectedIds ? selectedIds.size : wrap.querySelectorAll("input[type=checkbox]:checked").length;
+  document.getElementById("patient-count-hint").textContent = `(${n} sélectionné${n > 1 ? "s" : ""})`;
+}
+
+let selectedPatientIds = new Set();
+
+function openForm(user) {
+  editingUsername = user ? user.username : null;
+  document.getElementById("form-title").textContent = user ? `Modifier « ${user.username} »` : "Nouveau compte";
+  document.getElementById("f-username").value = user ? user.username : "";
+  document.getElementById("f-username").disabled = !!user;
+  document.getElementById("f-role").value = user ? user.role : "user";
+  document.getElementById("f-password").value = "";
+  document.getElementById("f-password").placeholder = user ? "Laisser vide pour ne pas changer" : "";
+  document.getElementById("password-hint").textContent = user
+    ? "Laisser vide pour conserver le mot de passe actuel."
+    : "Minimum 8 caractères.";
+  document.getElementById("patient-filter").value = "";
+  document.getElementById("form-error").classList.remove("visible");
+  selectedPatientIds = new Set(user ? (user.patients || []) : []);
+  renderPatientPicker(selectedPatientIds, "");
+  document.getElementById("form-panel").style.display = "block";
+  document.getElementById("form-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeForm() {
+  document.getElementById("form-panel").style.display = "none";
+  editingUsername = null;
+}
+
+document.getElementById("new-user-btn").addEventListener("click", () => openForm(null));
+document.getElementById("cancel-btn").addEventListener("click", closeForm);
+document.getElementById("patient-filter").addEventListener("input", (e) => {
+  renderPatientPicker(selectedPatientIds, e.target.value);
+});
+
+document.getElementById("save-btn").addEventListener("click", async () => {
+  const errorBox = document.getElementById("form-error");
+  errorBox.classList.remove("visible");
+  const username = document.getElementById("f-username").value.trim();
+  const role = document.getElementById("f-role").value;
+  const password = document.getElementById("f-password").value;
+  const patient_ids = Array.from(selectedPatientIds);
+
+  try {
+    let res;
+    if (editingUsername) {
+      const body = { role, patient_ids };
+      if (password) body.password = password;
+      res = await fetch(`/api/admin/users/${encodeURIComponent(editingUsername)}`, {
+        method: "PUT", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+    } else {
+      if (!username) { errorBox.textContent = "Identifiant requis."; errorBox.classList.add("visible"); return; }
+      if (!password) { errorBox.textContent = "Mot de passe requis."; errorBox.classList.add("visible"); return; }
+      res = await fetch("/api/admin/users", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, role, patient_ids }),
+      });
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      errorBox.textContent = body.detail || "Échec de l'enregistrement.";
+      errorBox.classList.add("visible");
+      return;
+    }
+    closeForm();
+    await refreshUsers();
+  } catch (err) {
+    errorBox.textContent = "Connexion au serveur impossible.";
+    errorBox.classList.add("visible");
+  }
+});
+
+async function deleteUser(username) {
+  if (!window.confirm(`Supprimer le compte « ${username} » ? Cette action est irréversible.`)) return;
+  const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}`, {
+    method: "DELETE", credentials: "same-origin",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    window.alert(body.detail || "Échec de la suppression.");
+    return;
+  }
+  await refreshUsers();
+}
+
+async function editUser(username) {
+  const res = await fetch("/api/admin/users", { credentials: "same-origin" });
+  const users = res.ok ? await res.json() : [];
+  const summary = users.find(u => u.username === username);
+  if (!summary) return;
+  openForm({ username: summary.username, role: summary.role, patients: summary.patients });
+}
+
+async function refreshUsers() {
+  const wrap = document.getElementById("users-table-wrap");
+  const res = await fetch("/api/admin/users", { credentials: "same-origin" });
+  if (!res.ok) { wrap.innerHTML = `<div class="empty-state">Impossible de charger les comptes.</div>`; return; }
+  const users = await res.json();
+  if (users.length === 0) {
+    wrap.innerHTML = `<div class="empty-state">Aucun compte pour l'instant.</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>Identifiant</th><th>Rôle</th><th>Patients affectés</th><th></th></tr></thead>
+      <tbody>
+        ${users.map(u => `
+          <tr>
+            <td>${u.username}</td>
+            <td><span class="pill ${u.role === 'admin' ? 'pill-admin' : 'pill-user'}">${u.role === 'admin' ? 'Administrateur' : 'Relecteur'}</span></td>
+            <td>${u.role === 'admin' ? 'Tous' : u.patientCount}</td>
+            <td class="actions">
+              <button class="btn btn-ghost btn-sm" data-action="edit" data-username="${u.username}">Modifier</button>
+              <button class="btn btn-danger btn-sm" data-action="delete" data-username="${u.username}">Supprimer</button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+  wrap.querySelectorAll("[data-action=edit]").forEach(btn =>
+    btn.addEventListener("click", () => editUser(btn.dataset.username)));
+  wrap.querySelectorAll("[data-action=delete]").forEach(btn =>
+    btn.addEventListener("click", () => deleteUser(btn.dataset.username)));
+}
+
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+  window.location.href = "/login.html";
+});
+
+(async function init() {
+  const me = await requireAdmin();
+  if (!me) return;
+  await loadPatients();
+  await refreshUsers();
+})();
+</script>
+</body>
+</html>

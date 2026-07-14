@@ -1,9 +1,14 @@
 """
 Gestion des annotations utilisateur.
 
-Chaque annotateur écrit dans SON PROPRE fichier CSV (data/annotations/annotations_<user>.csv).
+Chaque annotateur écrit dans SON PROPRE fichier CSV (<data_dir>/annotations/annotations_<user>.csv).
 => aucune écriture concurrente sur un même fichier, donc pas besoin de verrou de fichier
    même si plusieurs personnes travaillent en même temps.
+
+data_dir est toujours passé explicitement par l'appelant (le data/ de
+l'instance en cours — voir DATA_DIR dans main.py) : ce module ne doit pas
+supposer un dossier fixe, plusieurs instances tournant en parallèle avec
+des data/ différents.
 
 Pour une vue consolidée (export, relecture), `load_all_annotations()` concatène
 tous les fichiers du dossier.
@@ -15,10 +20,6 @@ from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path(__file__).parent / "data"
-ANNOTATIONS_DIR = DATA_DIR / "annotations"
-ANNOTATIONS_DIR.mkdir(parents=True, exist_ok=True)
-
 COLUMNS = [
     "timestamp", "user", "patient_id", "sejour_key",
     "item_type",   # "suggestion" | "code_valide" | "manuel"
@@ -28,23 +29,29 @@ COLUMNS = [
 ]
 
 
+def _annotations_dir(data_dir: Path) -> Path:
+    d = Path(data_dir) / "annotations"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def _safe_filename(user: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", user.strip()) or "anonyme"
     return f"annotations_{slug}.csv"
 
 
-def user_file(user: str) -> Path:
-    return ANNOTATIONS_DIR / _safe_filename(user)
+def user_file(data_dir: Path, user: str) -> Path:
+    return _annotations_dir(data_dir) / _safe_filename(user)
 
 
-def load_user_annotations(user: str) -> pd.DataFrame:
-    path = user_file(user)
+def load_user_annotations(data_dir: Path, user: str) -> pd.DataFrame:
+    path = user_file(data_dir, user)
     if not path.exists():
         return pd.DataFrame(columns=COLUMNS)
     return pd.read_csv(path)
 
 
-def append_annotation(user: str, patient_id: str, sejour_key: str, item_type: str,
+def append_annotation(data_dir: Path, user: str, patient_id: str, sejour_key: str, item_type: str,
                        item_id: str, action: str, code: str = "", libelle: str = "",
                        type_code: str = "", commentaire: str = "") -> None:
     row = {
@@ -53,7 +60,7 @@ def append_annotation(user: str, patient_id: str, sejour_key: str, item_type: st
         "item_type": item_type, "item_id": item_id, "action": action,
         "code": code, "libelle": libelle, "type_code": type_code, "commentaire": commentaire,
     }
-    path = user_file(user)
+    path = user_file(data_dir, user)
     df_row = pd.DataFrame([row], columns=COLUMNS)
     df_row.to_csv(path, mode="a", header=not path.exists(), index=False)
 
@@ -76,10 +83,10 @@ def latest_actions(user_annotations: pd.DataFrame, patient_id: str, sejour_key: 
     return subset.groupby("item_id", as_index=False).last()
 
 
-def load_all_annotations() -> pd.DataFrame:
+def load_all_annotations(data_dir: Path) -> pd.DataFrame:
     """Concatène les CSV de tous les annotateurs (pour export / relecture consolidée)."""
     frames = []
-    for f in ANNOTATIONS_DIR.glob("annotations_*.csv"):
+    for f in _annotations_dir(data_dir).glob("annotations_*.csv"):
         try:
             frames.append(pd.read_csv(f))
         except pd.errors.EmptyDataError:

@@ -71,6 +71,13 @@
   .sr-meta { font-size: 11px; color: var(--muted); font-weight: 400; }
   .search-empty { padding: 14px; text-align: center; color: var(--muted); font-size: 12.5px; }
 
+  .topbar-end { display: flex; align-items: flex-start; gap: 16px; flex: 0 0 auto; }
+  .account-badge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.14); border-radius: 999px; padding: 5px 6px 5px 12px; margin-top: 1px; }
+  .ab-info { display: flex; flex-direction: column; line-height: 1.25; }
+  .ab-name { font-weight: 700; font-size: 12px; }
+  .ab-role { font-size: 10px; opacity: .8; }
+  .ab-btn { width: 25px; height: 25px; border-radius: 50%; border: none; background: rgba(255,255,255,.25); color: #fff; font-size: 12.5px; display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; flex-shrink: 0; }
+  .ab-btn:hover { background: rgba(255,255,255,.4); }
   .topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: 0 0 auto; }
   .patient-nav { display: flex; align-items: center; gap: 7px; }
   .patient-nav-btn { width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(255,255,255,.25); color: #fff; font-size: 11px; flex-shrink: 0; }
@@ -279,7 +286,8 @@ const KIND_ICON = { parcours: "🧭", document: "📄", medicament: "💊", fich
 /* ------------------------------------------------------------------ */
 let currentPatientId = null;
 let currentSejourId = null;
-let currentUser = localStorage.getItem("annotator-name") || "";
+let currentUser = ""; // renseigné par boot() depuis la session serveur (/api/me)
+let currentUserRole = "";
 let manualCodeCounter = 1;
 let panelState = { editingValidatedId: null, editingSuggestionId: null };
 let activeHighlight = { kind: null, id: null };
@@ -481,22 +489,32 @@ function renderTopBar() {
     <div class="topbar" style="background:${grad}">
       <div class="topbar-row">
         ${renderContentSearchWidget()}
-        <div class="topbar-right">
-          <div class="patient-nav">
-            <button class="patient-nav-btn" data-action="prev-patient" title="Patient précédent">◀</button>
-            <div class="topbar-patient">
-              <span class="tp-avatar">${p.identity.id.slice(-2)}</span>
-              <div>
-                <div class="tp-id">${p.identity.id} <span class="tp-meta">${p.identity.sexe} · ${p.identity.age} ans</span></div>
-                <div class="tp-motif">${s.service} <span class="tp-meta">· ${s.motif}</span></div>
+        <div class="topbar-end">
+          <div class="topbar-right">
+            <div class="patient-nav">
+              <button class="patient-nav-btn" data-action="prev-patient" title="Patient précédent">◀</button>
+              <div class="topbar-patient">
+                <span class="tp-avatar">${p.identity.id.slice(-2)}</span>
+                <div>
+                  <div class="tp-id">${p.identity.id} <span class="tp-meta">${p.identity.sexe} · ${p.identity.age} ans</span></div>
+                  <div class="tp-motif">${s.service} <span class="tp-meta">· ${s.motif}</span></div>
+                </div>
               </div>
+              <button class="patient-nav-btn" data-action="next-patient" title="Patient suivant">▶</button>
             </div>
-            <button class="patient-nav-btn" data-action="next-patient" title="Patient suivant">▶</button>
+            <div class="patient-search-inline">
+              <span class="psi-dot" style="background:${accent}" title="Couleur du service actuel"></span>
+              <input type="text" id="patient-search-input" placeholder="Autre patient (identifiant, service, motif…)" value="${searchState.query}" autocomplete="off">
+              ${searchState.open ? renderSearchDropdown() : ""}
+            </div>
           </div>
-          <div class="patient-search-inline">
-            <span class="psi-dot" style="background:${accent}" title="Couleur du service actuel"></span>
-            <input type="text" id="patient-search-input" placeholder="Autre patient (identifiant, service, motif…)" value="${searchState.query}" autocomplete="off">
-            ${searchState.open ? renderSearchDropdown() : ""}
+          <div class="account-badge">
+            <div class="ab-info">
+              <span class="ab-name">${currentUser}</span>
+              <span class="ab-role">${currentUserRole === "admin" ? "Administrateur" : "Relecteur"}</span>
+            </div>
+            ${currentUserRole === "admin" ? `<a class="ab-btn" href="/admin.html" title="Administration">⚙</a>` : ""}
+            <button class="ab-btn" data-action="switch-account" title="Changer de compte">⇄</button>
           </div>
         </div>
       </div>
@@ -995,6 +1013,7 @@ document.addEventListener("click", (ev) => {
   if (action === "prev-patient") return cyclePatient(-1);
   if (action === "next-patient") return cyclePatient(1);
   if (action === "select-patient") return switchPatient(id);
+  if (action === "switch-account") return switchAccount();
 
   if (action === "select-sejour") {
     currentSejourId = id;
@@ -1190,7 +1209,7 @@ async function fetchPatientList() {
   return res.json();
 }
 async function fetchDossier(patientId) {
-  const res = await fetch(`/api/dossier/${encodeURIComponent(patientId)}?user=${encodeURIComponent(currentUser)}`);
+  const res = await fetch(`/api/dossier/${encodeURIComponent(patientId)}`);
   return res.json();
 }
 function postAnnotation(payload) {
@@ -1198,7 +1217,6 @@ function postAnnotation(payload) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      user: currentUser,
       patient_id: currentPatientId,
       sejour_key: currentSejourId,
       commentaire: "",
@@ -1207,13 +1225,28 @@ function postAnnotation(payload) {
   }).catch(err => console.error("Échec d'enregistrement de l'annotation :", err));
 }
 
+async function switchAccount() {
+  await fetch("/api/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+
 async function boot() {
-  while (!currentUser || !currentUser.trim()) {
-    currentUser = (window.prompt("Votre nom (annotateur) — utilisé pour enregistrer vos décisions séparément :", "") || "").trim();
+  const meRes = await fetch("/api/me");
+  if (!meRes.ok) {
+    window.location.href = "/login.html";
+    return;
   }
-  localStorage.setItem("annotator-name", currentUser);
+  const me = await meRes.json();
+  currentUser = me.username;
+  currentUserRole = me.role;
 
   const ids = await fetchPatientList();
+  if (ids.length === 0) {
+    document.getElementById("app").innerHTML =
+      `<div style="padding:48px; font-family:inherit; color:#64748b; font-size:15px;">` +
+      `Aucun patient ne vous est actuellement affecté. Contactez votre administrateur.</div>`;
+    return;
+  }
   for (const pid of ids) {
     PATIENTS[pid] = await fetchDossier(pid);
   }

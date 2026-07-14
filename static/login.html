@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — Dossier patient</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #dfe4e8;
+    --text: #1c2b36;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-soft: #eaf1ff;
+    --red: #dc2626;
+    --red-soft: #fdecec;
+    --shadow-md: 0 8px 24px rgba(16,24,32,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card {
+    width: 100%; max-width: 340px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    padding: 32px 28px;
+  }
+  .card h1 {
+    margin: 0 0 4px; font-size: 18px; font-weight: 700;
+  }
+  .card p.sub {
+    margin: 0 0 24px; color: var(--muted); font-size: 13px;
+  }
+  label {
+    display: block; font-size: 12.5px; font-weight: 600; color: var(--muted);
+    margin: 16px 0 6px;
+  }
+  input {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); font-family: inherit; font-size: 14px;
+    background: #fbfcfd;
+  }
+  input:focus {
+    outline: none; border-color: var(--accent);
+    background: #fff;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  button {
+    width: 100%; margin-top: 24px; padding: 11px 12px;
+    border: none; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #1d4fc4; }
+  button:disabled { opacity: .6; cursor: default; }
+  .error {
+    margin-top: 16px; padding: 10px 12px; border-radius: 8px;
+    background: var(--red-soft); color: var(--red);
+    font-size: 13px; display: none;
+  }
+  .error.visible { display: block; }
+</style>
+</head>
+<body>
+  <form class="card" id="login-form" autocomplete="on">
+    <h1>Dossier patient</h1>
+    <p class="sub">Connexion relecteur</p>
+
+    <label for="username">Identifiant</label>
+    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required>
+
+    <button type="submit" id="submit-btn">Se connecter</button>
+    <div class="error" id="error-box"></div>
+  </form>
+
+<script>
+async function checkAlreadyLoggedIn() {
+  const res = await fetch("/api/me", { credentials: "same-origin" });
+  if (res.ok) window.location.href = "/";
+}
+checkAlreadyLoggedIn();
+
+const form = document.getElementById("login-form");
+const errorBox = document.getElementById("error-box");
+const submitBtn = document.getElementById("submit-btn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorBox.classList.remove("visible");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Connexion…";
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.getElementById("username").value.trim(),
+        password: document.getElementById("password").value,
+      }),
+    });
+    if (res.ok) {
+      window.location.href = "/";
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    errorBox.textContent = body.detail || "Identifiant ou mot de passe incorrect.";
+    errorBox.classList.add("visible");
+  } catch (err) {
+    errorBox.textContent = "Connexion au serveur impossible. Réessayez.";
+    errorBox.classList.add("visible");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Se connecter";
+  }
+});
+</script>
+</body>
+</html>

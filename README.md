@@ -4,20 +4,26 @@ Cette version garde **votre prototype HTML/CSS/JS quasiment tel quel**
 (mêmes styles, même rendu — bento, rail de navigation, chatbot, recherche…)
 et lui branche un petit backend Python (FastAPI) qui :
 
+- authentifie chaque relecteur (compte + mot de passe géré par un admin) et
+  ne lui montre que les patients qui lui sont affectés
 - lit les données de référence depuis des fichiers **Excel** (lecture seule)
 - écrit chaque décision d'annotation dans un **CSV propre à chaque utilisateur**
 
-C'est la différence avec la première version (Streamlit) : ici l'interface
-visuelle reste exactement celle de votre maquette, seul le "câblage" des
-données change (fetch réseau au lieu de données codées en dur en mémoire JS).
+L'app peut tourner en **plusieurs instances indépendantes sur la même
+machine**, une par port : chacune a son propre dossier de données, ses
+propres comptes, sa propre liste de patients affectés — utile pour séparer
+des jeux de données vraiment distincts (services, projets…), chacun avec
+ses relecteurs.
 
-## Lancer l'application
+## Démarrage rapide (une seule instance)
 
-Trois commandes suffisent, à exécuter depuis le dossier du projet :
+Pour continuer à travailler avec le dossier `data/` existant, sans passer
+par le mécanisme multi-instances :
 
 ```bash
 pip install -r requirements.txt     # dépendances (une fois)
 python generate_sample_data.py      # génère les données de référence (une fois)
+python auth_store.py . create-user <votre_nom> --role admin   # premier compte
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -28,10 +34,9 @@ dossier `Scripts` de Python n'est pas dans le PATH), utilisez plutôt :
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Puis ouvrez `http://localhost:8000` (ou l'IP de la machine sur le réseau
-local pour que plusieurs personnes s'y connectent). Au premier chargement,
-un prompt demande le nom de l'annotateur — il est retenu ensuite dans le
-navigateur (`localStorage`) donc pas besoin de le retaper à chaque visite.
+Puis ouvrez `http://localhost:8000` — vous arrivez sur une page de
+connexion. Au premier lancement, si aucun compte n'existe encore, le
+serveur l'affiche dans sa sortie console avec la commande à lancer.
 
 Pour arrêter le serveur : `Ctrl+C` dans le terminal où il tourne.
 
@@ -39,19 +44,201 @@ Si vous modifiez `generate_sample_data.py`, relancez-le pour régénérer les
 fichiers `.xlsx` dans `data/` — le serveur les relit à chaque redémarrage
 (pas besoin de relancer `pip install`).
 
+## Plusieurs instances, plusieurs ports
+
+Chaque instance = un dossier contenant `data/` (tables Excel + annotations)
+et `.auth/` (comptes de cette instance, voir plus bas) = un port. Deux
+instances ne partagent ni données ni comptes.
+
+**Créer une instance** (ex : un jeu de données "cardiologie") :
+
+```bash
+python new_instance.py cardiologie --port 8001
+```
+
+Le script crée `instances/cardiologie/data/` (vide — déposez-y vos
+`.xlsx` de référence, mêmes colonnes que `generate_sample_data.py`),
+demande le premier compte administrateur de cette instance, et
+l'enregistre dans `instances.json`. Ajoutez `--demo` pour la remplir avec
+le jeu de données fictif à la place (pratique pour tester) :
+
+```bash
+python new_instance.py cardiologie --port 8001 --demo
+```
+
+**Lancer une instance en particulier :**
+
+```bash
+# Linux / macOS
+DOSSIER_INSTANCE_DIR="instances/cardiologie" python3 -m uvicorn main:app --host 0.0.0.0 --port 8001
+```
+
+```powershell
+# Windows
+$env:DOSSIER_INSTANCE_DIR = "instances/cardiologie"
+python -m uvicorn main:app --host 0.0.0.0 --port 8001
+```
+
+**Lancer toutes les instances enregistrées d'un coup :**
+
+```bash
+./launch_all.sh      # Linux / macOS
+```
+
+```powershell
+.\launch_all.ps1     # Windows
+```
+
+Ces scripts lisent `instances.json` et démarrent un process `uvicorn` par
+instance, chacun sur son port, en arrière-plan (logs dans
+`instances/<nom>/server.out.log` et `server.err.log`). Le manifeste
+`instances.json` est toujours écrit avec des chemins au format POSIX (`/`),
+utilisable tel quel par les deux scripts quelle que soit la plateforme sur
+laquelle une instance a été créée.
+
+## Déploiement pas à pas sur Ubuntu
+
+Étapes pour faire tourner l'app sur un serveur Ubuntu propre (testé sur
+Ubuntu 22.04/24.04). `launch_all.sh` est l'équivalent Linux de
+`launch_all.ps1`.
+
+**1. Prérequis système**
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip git
+```
+
+**2. Récupérer le code**
+
+```bash
+git clone https://github.com/lucasshorten/test_fastapi.git dossier-patient
+cd dossier-patient
+```
+
+(ou `scp -r` le dossier depuis votre machine si vous ne passez pas par Git.)
+
+**3. Environnement virtuel et dépendances**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`.venv/` est à recréer sur chaque machine — ne pas le copier depuis Windows,
+ne pas le committer (déjà exclu par `.gitignore`).
+
+**4. Rendre les scripts exécutables** (le bit d'exécution ne survit pas
+toujours à un `git clone` selon l'origine du dépôt) :
+
+```bash
+chmod +x launch_all.sh
+```
+
+**5. Créer au moins une instance**
+
+Pour un jeu de données réel, sur son propre port :
+
+```bash
+python new_instance.py cardiologie --port 8001
+# Déposez ensuite vos .xlsx de référence dans instances/cardiologie/data/
+```
+
+Ou, pour vérifier rapidement que tout fonctionne avec des données fictives :
+
+```bash
+python new_instance.py demo --port 8001 --demo
+```
+
+Dans les deux cas, le script demande interactivement l'identifiant et le
+mot de passe du premier compte administrateur de cette instance.
+
+Répétez cette étape pour chaque jeu de données distinct à héberger sur ce
+serveur (un port différent à chaque fois).
+
+**6. Lancer toutes les instances enregistrées**
+
+```bash
+./launch_all.sh
+```
+
+Chaque instance tourne en arrière-plan via `nohup` : elle continue de
+tourner même après la fermeture de la session SSH. Les logs sont dans
+`instances/<nom>/server.out.log` et `server.err.log`.
+
+**7. Vérifier**
+
+```bash
+curl -I http://localhost:8001/login.html   # doit répondre 200
+pgrep -fa "uvicorn main:app"               # liste les process lancés
+```
+
+**8. Ouvrir le port dans le pare-feu**, si `ufw` est actif :
+
+```bash
+sudo ufw allow 8001/tcp   # un par instance déployée
+```
+
+**9. Arrêter les instances**
+
+```bash
+pkill -f "uvicorn main:app"
+```
+
+**Pour survivre à un redémarrage du serveur** (au-delà de `nohup`, qui ne
+protège que d'une déconnexion SSH) : ajoutez un service `systemd` par
+instance qui exécute `launch_all.sh`, ou plus simplement une entrée
+`@reboot` dans `crontab -e` :
+
+```
+@reboot cd /chemin/vers/dossier-patient && ./launch_all.sh
+```
+
+## Comptes, authentification et affectations
+
+Chaque instance gère ses comptes dans `<instance>/.auth/credentials.yaml`
+— un fichier, pas une base de données, sur le modèle de `.streamlit/` :
+lisible/récupérable à la main en cas de besoin, mais **jamais édité
+directement** en pratique puisque le panneau d'administration s'en charge.
+Les mots de passe y sont hachés (PBKDF2-HMAC-SHA256), jamais en clair.
+
+- **Connexion** : `/login.html` (identifiant + mot de passe). La session
+  dure 12h, portée par un cookie signé — pas de table de sessions à purger.
+- **Panneau admin** : `/admin.html`, réservé aux comptes de rôle `admin`.
+  Permet de créer/supprimer des comptes, changer un mot de passe, et
+  choisir la liste de patients affectés à chaque relecteur (cases à cocher
+  filtrables). Un lien "⚙ Admin" apparaît automatiquement dans l'app pour
+  les administrateurs.
+- **Un relecteur** (`role: user`) ne voit que les patients qui lui sont
+  affectés — `/api/patients` et `/api/dossier/{id}` sont filtrés côté
+  serveur, pas seulement côté affichage.
+- **Un administrateur** voit tous les patients de son instance et peut
+  exporter toutes les annotations (`/api/export`).
+- Gestion en ligne de commande possible sans passer par le panneau admin :
+  `python auth_store.py <dossier_instance> create-user|set-password|list-users|delete-user …`
+
+Le dernier compte administrateur d'une instance ne peut être ni supprimé
+ni rétrogradé, pour éviter de se retrouver bloqué dehors.
+
 ## Ce qui a changé dans `static/index.html` par rapport à votre prototype
 
-Uniquement le "câblage données", rien côté visuel :
+Uniquement le "câblage données" et l'authentification, rien côté visuel :
 
 1. L'objet `PATIENTS` codé en dur a été vidé (`let PATIENTS = {};`) : il est
    maintenant rempli au chargement via `fetch("/api/dossier/...")`.
-2. Un petit bloc `boot()` en bas du fichier demande le nom de l'annotateur,
-   charge la liste des patients puis leurs dossiers, et lance `render()`
-   (au lieu de l'appel `render()` immédiat sur données statiques).
+2. `boot()` vérifie la session (`/api/me`) ; si absente, redirige vers
+   `/login.html`. Sinon, charge la liste des patients (déjà filtrée par le
+   serveur selon le compte connecté) puis leurs dossiers, et lance
+   `render()`. La barre supérieure affiche, à droite du bloc de navigation
+   patient, un badge compact avec l'utilisateur connecté, son rôle, un lien
+   ⚙ vers l'admin (si applicable) et un bouton ⇄ pour changer de compte
+   (déconnexion + retour à `/login.html`).
 3. Chaque action qui modifiait l'état en mémoire (valider/rejeter/modifier
    une suggestion, supprimer/restaurer/modifier un code validé, ajouter un
    code manuel) appelle en plus `postAnnotation(...)`, qui envoie la décision
-   au backend (`POST /api/annotate`) — en parallèle de la mise à jour visuelle
+   au backend (`POST /api/annotate`, l'identité vient de la session, plus
+   besoin de la transmettre) — en parallèle de la mise à jour visuelle
    instantanée déjà présente dans votre code.
 
 Tout le reste (CSS, structure des `render...()`, recherche, bento, chatbot,
@@ -84,14 +271,20 @@ tables Excel / la même API :
 
 | Route                              | Rôle                                                         |
 |-------------------------------------|---------------------------------------------------------------|
-| `GET /api/patients`                 | liste des identifiants patients                                |
-| `GET /api/dossier/{id}?user=...`    | dossier complet, avec les codes/suggestions déjà fusionnés avec les décisions passées de cet utilisateur |
-| `POST /api/annotate`                | enregistre une décision d'annotation                            |
-| `GET /api/export`                   | CSV consolidé de toutes les annotations, tous utilisateurs confondus |
+| `POST /api/login`                   | authentification (identifiant + mot de passe), pose le cookie de session |
+| `POST /api/logout`                  | efface le cookie de session                                    |
+| `GET /api/me`                       | identité et rôle du compte connecté                             |
+| `GET /api/patients`                 | liste des patients visibles par le compte connecté (filtrée par affectation, sauf admin) |
+| `GET /api/dossier/{id}`             | dossier complet du patient, avec les codes/suggestions déjà fusionnés avec les décisions passées de cet utilisateur — 403 si le patient n'est pas affecté |
+| `POST /api/annotate`                | enregistre une décision d'annotation pour le compte connecté    |
+| `GET /api/export`                   | CSV consolidé de toutes les annotations, tous utilisateurs confondus (admin uniquement) |
+| `GET/POST /api/admin/users`         | lister / créer des comptes (admin uniquement)                   |
+| `PUT/DELETE /api/admin/users/{u}`   | modifier (mot de passe, rôle, affectations) / supprimer un compte (admin uniquement) |
+| `GET /api/admin/patients`           | liste des patients de l'instance, pour l'écran d'affectation (admin uniquement) |
 
 ## Architecture des données (identique à la logique demandée)
 
-### Excel (lecture seule) dans `data/`
+### Excel (lecture seule) dans `<instance>/data/`
 `patients`, `sejours`, `parcours`, `documents`, `fiches`, `observations`,
 `constantes`, `biologie`, `medicaments`, `administrations`, `codes_valides`,
 `suggestions` — un fichier `.xlsx` par table. `fiches` a une ligne par champ
@@ -101,26 +294,37 @@ fréquence de chaque médicament — voir `generate_sample_data.py`).
 `generate_sample_data.py` reprend les données fictives de votre prototype ;
 remplacez-le par votre export réel en gardant les mêmes colonnes.
 
-### CSV (écriture) dans `data/annotations/`
+### CSV (écriture) dans `<instance>/data/annotations/`
 Un fichier `annotations_<nom_utilisateur>.csv` par annotateur → aucune
 écriture concurrente possible même si plusieurs personnes valident des
 codes en même temps. Colonnes : `timestamp, user, patient_id, sejour_key,
 item_type, item_id, action, code, libelle, type_code, commentaire`.
 
-Pour consolider tous les CSV en un seul DataFrame :
+Pour consolider tous les CSV d'une instance en un seul DataFrame :
 ```python
 import annotations_store as store
-df = store.load_all_annotations()
+df = store.load_all_annotations(Path("instances/cardiologie/data"))
 ```
-(ou directement via `GET /api/export` dans un navigateur / avec `curl`).
+(ou directement via `GET /api/export` dans un navigateur / avec `curl`,
+connecté avec un compte admin).
+
+### YAML (comptes) dans `<instance>/.auth/credentials.yaml`
+Comptes, mots de passe hachés et patients affectés à chaque relecteur —
+voir la section « Comptes, authentification et affectations » ci-dessus.
 
 ## Limites assumées
 
-- Pas d'authentification réelle : le nom saisi au prompt n'est pas vérifié.
-  Suffisant pour une petite équipe interne de confiance.
 - Le chatbot reste la recherche par mots-clés du prototype d'origine
   (pas un vrai LLM) — à remplacer par un appel à l'API Claude si vous le
   souhaitez, en gardant le même format de réponse `{text, sources}`.
 - Si deux annotateurs travaillent en même temps sur le même dossier, ils ne
   voient pas les décisions de l'autre en direct (chacun ne voit que ses
   propres décisions, par design — cf. `data/annotations/`).
+- Pas de limitation du nombre de tentatives de connexion (acceptable pour
+  une petite équipe interne de confiance ; à ajouter avant une exposition
+  plus large).
+- Le cookie de session n'est pas marqué `secure` : convient à un usage sur
+  réseau interne en HTTP. Si l'app est un jour exposée derrière un reverse
+  proxy TLS, ajoutez `secure=True` dans `main.py` (`login()`).
+- Pas de réinitialisation de mot de passe en libre-service : c'est
+  l'administrateur de l'instance qui la fait depuis `/admin.html`.

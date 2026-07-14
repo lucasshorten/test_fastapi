@@ -1,2 +1,17 @@
 __pycache__/
 *.pyc
+
+# Comptes/mots de passe (hachés, mais jamais poussés sur le dépôt) et
+# instances déployées localement (données + comptes propres à chaque port).
+.auth/
+instances/
+instances.json
+
+# Logs des scripts de lancement
+*.out.log
+*.err.log
+server.log
+
+# Environnements virtuels Python
+.venv/
+venv/

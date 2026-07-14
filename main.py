@@ -1,32 +1,108 @@
 """
 Backend FastAPI :
-- sert le frontend statique (static/index.html — le prototype quasi inchangé)
+- authentifie chaque relecteur (compte + mot de passe géré par l'admin,
+  voir auth_store.py) et ne lui expose que les patients qui lui sont
+  affectés
+- sert le frontend statique (static/ — le prototype quasi inchangé)
 - expose les données de référence (Excel) en JSON, fusionnées avec les
   annotations de l'utilisateur courant
 - reçoit les annotations et les ajoute au CSV propre à cet utilisateur
 
+Une instance = un dossier (contenant data/ et .auth/) = un port. Plusieurs
+instances peuvent tourner en parallèle sur la même machine (voir
+new_instance.py et launch_all.ps1) ; chacune a ses propres comptes et ses
+propres données, totalement indépendants des autres.
+
+Dossier d'instance choisi via la variable d'environnement
+DOSSIER_INSTANCE_DIR (par défaut : le dossier de ce fichier).
+
 Lancer avec :  uvicorn main:app --reload --host 0.0.0.0 --port 8000
 """
+import os
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, Query
-from fastapi.responses import PlainTextResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import annotations_store as store
+import auth_store
 
-DATA_DIR = Path(__file__).parent / "data"
+INSTANCE_DIR = Path(os.environ.get("DOSSIER_INSTANCE_DIR", Path(__file__).parent))
+DATA_DIR = INSTANCE_DIR / "data"
 STATIC_DIR = Path(__file__).parent / "static"
+SESSION_COOKIE = "session"
 
 TABLE_NAMES = ["patients", "sejours", "parcours", "documents", "fiches", "observations",
                "constantes", "biologie", "medicaments", "administrations",
                "codes_valides", "suggestions"]
 TABLES = {n: pd.read_excel(DATA_DIR / f"{n}.xlsx") for n in TABLE_NAMES}
+ALL_PATIENT_IDS = TABLES["patients"]["patient_id"].tolist()
+
+auth_store.init_db(INSTANCE_DIR)
+if auth_store.user_count(INSTANCE_DIR) == 0:
+    print(f"\nAucun compte configuré pour cette instance ({INSTANCE_DIR}).")
+    print("Créez le premier compte admin avec :")
+    print(f'    python auth_store.py "{INSTANCE_DIR}" create-user <votre_nom> --role admin\n')
 
 app = FastAPI(title="Dossier patient — API")
 
+
+# ------------------------------------------------------------- authentification --
+
+def current_user(request: Request) -> dict:
+    token = request.cookies.get(SESSION_COOKIE)
+    username = auth_store.verify_session_token(INSTANCE_DIR, token) if token else None
+    user = auth_store.get_user(INSTANCE_DIR, username) if username else None
+    if user is None:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    return user
+
+
+def require_admin(user: dict = Depends(current_user)) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Réservé aux administrateurs")
+    return user
+
+
+def visible_patient_ids(user: dict) -> set:
+    if user["role"] == "admin":
+        return set(ALL_PATIENT_IDS)
+    return set(auth_store.get_assigned_patients(INSTANCE_DIR, user["username"]))
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login")
+def login(body: LoginIn):
+    user = auth_store.authenticate(INSTANCE_DIR, body.username, body.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
+    token = auth_store.make_session_token(INSTANCE_DIR, user["username"])
+    response = JSONResponse(user)
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax",
+                         max_age=auth_store.SESSION_TTL_SECONDS, path="/")
+    return response
+
+
+@app.post("/api/logout")
+def logout():
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
+@app.get("/api/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+
+# ------------------------------------------------------------------- dossier --
 
 def table_for(name, patient_id, sejour_key=None):
     df = TABLES[name]
@@ -45,7 +121,7 @@ def build_dossier(patient_id: str, user: str) -> dict:
     sejours_df = table_for("sejours", patient_id).sort_values("ordre")
     sejour_order = sejours_df["sejour_key"].tolist()
 
-    user_annot = store.load_user_annotations(user)
+    user_annot = store.load_user_annotations(DATA_DIR, user)
 
     sejours = {}
     for _, s in sejours_df.iterrows():
@@ -164,7 +240,6 @@ def build_dossier(patient_id: str, user: str) -> dict:
 
 
 class AnnotationIn(BaseModel):
-    user: str
     patient_id: str
     sejour_key: str
     item_type: str
@@ -177,26 +252,105 @@ class AnnotationIn(BaseModel):
 
 
 @app.get("/api/patients")
-def list_patients():
-    return TABLES["patients"]["patient_id"].tolist()
+def list_patients(user: dict = Depends(current_user)):
+    allowed = visible_patient_ids(user)
+    return [pid for pid in ALL_PATIENT_IDS if pid in allowed]
 
 
 @app.get("/api/dossier/{patient_id}")
-def get_dossier(patient_id: str, user: str = Query(...)):
-    return build_dossier(patient_id, user)
+def get_dossier(patient_id: str, user: dict = Depends(current_user)):
+    if patient_id not in visible_patient_ids(user):
+        raise HTTPException(status_code=403, detail="Patient non accessible pour ce compte")
+    return build_dossier(patient_id, user["username"])
 
 
 @app.post("/api/annotate")
-def post_annotate(a: AnnotationIn):
-    store.append_annotation(a.user, a.patient_id, a.sejour_key, a.item_type, a.item_id,
-                             a.action, a.code, a.libelle, a.type_code, a.commentaire)
+def post_annotate(a: AnnotationIn, user: dict = Depends(current_user)):
+    if a.patient_id not in visible_patient_ids(user):
+        raise HTTPException(status_code=403, detail="Patient non accessible pour ce compte")
+    store.append_annotation(DATA_DIR, user["username"], a.patient_id, a.sejour_key, a.item_type,
+                             a.item_id, a.action, a.code, a.libelle, a.type_code, a.commentaire)
     return {"ok": True}
 
 
 @app.get("/api/export")
-def export_all():
-    df = store.load_all_annotations()
+def export_all(admin: dict = Depends(require_admin)):
+    df = store.load_all_annotations(DATA_DIR)
     return PlainTextResponse(df.to_csv(index=False), media_type="text/csv")
+
+
+# --------------------------------------------------------------------- admin --
+
+class NewUserIn(BaseModel):
+    username: str
+    password: str
+    role: str = "user"
+    patient_ids: list[str] = []
+
+
+class UpdateUserIn(BaseModel):
+    password: str | None = None
+    role: str | None = None
+    patient_ids: list[str] | None = None
+
+
+def _admin_usernames() -> list[str]:
+    return [u["username"] for u in auth_store.list_users(INSTANCE_DIR) if u["role"] == "admin"]
+
+
+@app.get("/api/admin/users")
+def admin_list_users(admin: dict = Depends(require_admin)):
+    return auth_store.list_users(INSTANCE_DIR)
+
+
+@app.get("/api/admin/patients")
+def admin_list_patients(admin: dict = Depends(require_admin)):
+    return [
+        {"id": r["patient_id"], "sexe": r["sexe"], "age": int(r["age"])}
+        for _, r in TABLES["patients"].iterrows()
+    ]
+
+
+@app.post("/api/admin/users")
+def admin_create_user(body: NewUserIn, admin: dict = Depends(require_admin)):
+    try:
+        auth_store.create_user(INSTANCE_DIR, body.username, body.password,
+                                role=body.role, patient_ids=body.patient_ids)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{username}")
+def admin_update_user(username: str, body: UpdateUserIn, admin: dict = Depends(require_admin)):
+    try:
+        if body.role is not None and body.role != "admin":
+            if username in _admin_usernames() and _admin_usernames() == [username]:
+                raise HTTPException(status_code=400,
+                                     detail="Impossible de retirer le dernier compte administrateur")
+        if body.password is not None:
+            auth_store.set_password(INSTANCE_DIR, username, body.password)
+        if body.role is not None:
+            auth_store.set_role(INSTANCE_DIR, username, body.role)
+        if body.patient_ids is not None:
+            auth_store.set_assigned_patients(INSTANCE_DIR, username, body.patient_ids)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{username}")
+def admin_delete_user(username: str, admin: dict = Depends(require_admin)):
+    if username in _admin_usernames() and _admin_usernames() == [username]:
+        raise HTTPException(status_code=400,
+                             detail="Impossible de supprimer le dernier compte administrateur")
+    try:
+        auth_store.delete_user(INSTANCE_DIR, username)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    return {"ok": True}
 
 
 # Doit être monté en dernier : les routes /api/* déclarées ci-dessus sont
