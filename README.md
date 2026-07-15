@@ -327,14 +327,28 @@ connecté avec un compte admin).
 Comptes, mots de passe hachés et patients affectés à chaque relecteur —
 voir la section « Comptes, authentification et affectations » ci-dessus.
 
-### YAML (règles IA) dans `<instance>/data/rules.yaml`
+### Excel + CSV (règles IA) dans `<instance>/data/rules*`
 Dictionnaire des règles/algorithmes de détection utilisés pour générer les
 suggestions de codage, accessible via le bouton « ℹ️ Règles » à côté de
 « Suggestion » dans le panneau de codage. Partagé entre tous les comptes de
 l'instance (contrairement aux annotations), généré avec des règles par
-défaut au premier accès s'il n'existe pas encore. Modifier une règle ou
-ajouter un commentaire est purement documentaire : ça ne change jamais les
-suggestions déjà générées pour les séjours en cours.
+défaut au premier accès si les fichiers n'existent pas encore. Modifier une
+règle ou ajouter un commentaire est purement documentaire : ça ne change
+jamais les suggestions déjà générées pour les séjours en cours.
+
+Trois fichiers, comme pour le reste des données de référence :
+- `rules.xlsx` — une ligne par règle (`id`, `titre`, `categorie`, `logique`,
+  `code`, `libelle`, `type`, `description`).
+- `rules_parametres.xlsx` — une ligne par condition machine-lisible
+  (`rule_id`, `ordre`, `champ`, `operateur`, `valeur`, `flags`) ; une règle
+  avec plusieurs conditions ET-combinées (ex. RG-03) a plusieurs lignes avec
+  le même `rule_id`. Une valeur de type liste (opérateur `wordlist`) est
+  stockée comme une seule chaîne, les termes séparés par `|`.
+- `rules_commentaires.csv` — un fichier qui grossit au fil des commentaires
+  ajoutés par les relecteurs (`id`, `rule_id`, `auteur`, `date`, `texte`),
+  écrit en ajout seul comme les CSV d'annotations (voir plus bas) : jamais de
+  ré-écriture complète du fichier, donc pas de risque d'écrasement même si
+  plusieurs relecteurs commentent en même temps.
 
 Chaque règle a un identifiant stable (`RG-01`, `RG-02`...), affiché dans la
 pop-up, et rattaché à un ou plusieurs codes (CIM-10/CCAM) exprimés en
@@ -367,12 +381,6 @@ for rule in rules:
 Ce n'est pas un moteur de règles branché sur la génération des suggestions
 (volontairement — voir plus haut), juste un format prêt à être consommé par
 un futur script d'automatisation.
-
-`rules.yaml` est écrit dans un format pensé pour rester lisible/modifiable
-à la main : les champs multi-lignes (`logique`) utilisent le style bloc
-YAML (`|`) plutôt que des chaînes repliées entre guillemets, ce qui évite
-les apostrophes doublées et les retours à la ligne forcés en plein milieu
-d'une phrase.
 
 ### Passages surlignés (`highlight`) dans `suggestions.xlsx`
 Le passage à surligner dans un document/une fiche/une observation quand on

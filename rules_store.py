@@ -3,16 +3,25 @@ Dictionnaire des règles/algorithmes utilisés pour générer les suggestions de
 codage — partagé entre tous les utilisateurs d'une instance (contrairement
 aux annotations, qui restent propres à chaque relecteur).
 
-Un fichier YAML par instance : <data_dir>/rules.yaml, à côté des tables
-Excel de référence. Modifier une règle ou ajouter un commentaire est
-purement documentaire : ça n'affecte jamais les suggestions déjà générées
-(pas de lien vers la logique de génération, volontairement).
+Trois fichiers par instance, à côté des tables Excel de référence :
+    <data_dir>/rules.xlsx              une ligne par règle (titre, logique,
+                                        description, code, libelle, type...)
+    <data_dir>/rules_parametres.xlsx   une ligne par condition machine-lisible
+                                        (une règle peut avoir plusieurs
+                                        conditions combinées par ET)
+    <data_dir>/rules_commentaires.csv  une ligne par commentaire ajouté par un
+                                        relecteur, append-only (même logique
+                                        que annotations_store.py)
+
+Modifier une règle ou ajouter un commentaire est purement documentaire : ça
+n'affecte jamais les suggestions déjà générées (pas de lien vers la logique
+de génération, volontairement).
 """
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
+import pandas as pd
 
 # Chaque règle porte un identifiant stable "RG-xx" (utilisé comme clé d'API,
 # affiché à l'écran, et cliquable depuis une suggestion pour ouvrir cette
@@ -289,47 +298,108 @@ DEFAULT_RULES = [
     },
 ]
 
+RULES_COLUMNS = ["id", "titre", "categorie", "logique", "code", "libelle", "type", "description"]
+PARAMETRES_COLUMNS = ["rule_id", "ordre", "champ", "operateur", "valeur", "flags"]
+COMMENTAIRES_COLUMNS = ["id", "rule_id", "auteur", "date", "texte"]
+
 
 def _rules_path(data_dir: Path) -> Path:
-    return Path(data_dir) / "rules.yaml"
+    return Path(data_dir) / "rules.xlsx"
+
+
+def _parametres_path(data_dir: Path) -> Path:
+    return Path(data_dir) / "rules_parametres.xlsx"
+
+
+def _commentaires_path(data_dir: Path) -> Path:
+    return Path(data_dir) / "rules_commentaires.csv"
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _literal_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
-    """Affiche les champs multi-lignes (ex. "logique") en bloc littéral YAML
-    ("|") plutôt qu'en chaîne repliée entre guillemets : ça évite les
-    apostrophes doublées et les retours à la ligne forcés qui rendent le
-    fichier illisible/impraticable à modifier à la main."""
-    style = "|" if "\n" in data else None
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
-
-
-yaml.add_representer(str, _literal_str_representer, Dumper=yaml.SafeDumper)
-
-
-def _load(data_dir: Path) -> list[dict]:
-    path = _rules_path(data_dir)
+def _read_table(path: Path, columns: list[str]) -> pd.DataFrame:
+    """Lit un fichier de règles en tolérant son absence : un fichier manquant
+    (ou vide) devient une table vide conforme au schéma plutôt qu'une erreur."""
     if not path.exists():
-        rules = [dict(r, commentaires=list(r["commentaires"])) for r in DEFAULT_RULES]
-        _save(data_dir, rules)
-        return rules
-    with open(path, "r", encoding="utf-8") as f:
-        doc = yaml.safe_load(f) or {}
-    return doc.get("rules", [])
+        return pd.DataFrame(columns=columns)
+    df = pd.read_csv(path) if path.suffix == ".csv" else pd.read_excel(path)
+    for col in columns:
+        if col not in df.columns:
+            df[col] = pd.NA
+    return df
 
 
-def _save(data_dir: Path, rules: list[dict]) -> None:
+def _condition_to_row(rule_id: str, ordre: int, cond: dict) -> dict:
+    valeur = cond.get("valeur")
+    if isinstance(valeur, list):
+        valeur = "|".join(str(v) for v in valeur)
+    return {
+        "rule_id": rule_id, "ordre": ordre, "champ": cond["champ"],
+        "operateur": cond["operateur"], "valeur": valeur, "flags": cond.get("flags"),
+    }
+
+
+def _row_to_condition(row) -> dict:
+    valeur = row["valeur"]
+    if row["operateur"] == "wordlist":
+        valeur = str(valeur).split("|") if not pd.isna(valeur) else []
+    elif pd.isna(valeur):
+        valeur = None
+    cond = {"champ": row["champ"], "operateur": row["operateur"], "valeur": valeur}
+    if not pd.isna(row["flags"]):
+        cond["flags"] = row["flags"]
+    return cond
+
+
+def _ensure_initialized(data_dir: Path) -> None:
+    if _rules_path(data_dir).exists():
+        return
+    rules_rows, params_rows = [], []
+    for r in DEFAULT_RULES:
+        rules_rows.append({col: r[col] for col in RULES_COLUMNS})
+        for ordre, cond in enumerate(r["parametres"]):
+            params_rows.append(_condition_to_row(r["id"], ordre, cond))
+    _save_rules_table(data_dir, pd.DataFrame(rules_rows, columns=RULES_COLUMNS))
+    _save_parametres_table(data_dir, pd.DataFrame(params_rows, columns=PARAMETRES_COLUMNS))
+    if not _commentaires_path(data_dir).exists():
+        pd.DataFrame(columns=COMMENTAIRES_COLUMNS).to_csv(_commentaires_path(data_dir), index=False)
+
+
+def _save_rules_table(data_dir: Path, df: pd.DataFrame) -> None:
     path = _rules_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump({"rules": rules}, f, allow_unicode=True, sort_keys=False, width=4096)
+    df.to_excel(path, index=False)
+
+
+def _save_parametres_table(data_dir: Path, df: pd.DataFrame) -> None:
+    path = _parametres_path(data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_excel(path, index=False)
+
+
+def _rule_dict(rule_row, params_df: pd.DataFrame, comments_df: pd.DataFrame) -> dict:
+    rule_id = rule_row["id"]
+    prows = params_df[params_df["rule_id"] == rule_id].sort_values("ordre")
+    crows = comments_df[comments_df["rule_id"] == rule_id]
+    return {
+        "id": rule_id, "titre": rule_row["titre"], "categorie": rule_row["categorie"],
+        "logique": rule_row["logique"],
+        "parametres": [_row_to_condition(pr) for _, pr in prows.iterrows()],
+        "code": rule_row["code"], "libelle": rule_row["libelle"], "type": rule_row["type"],
+        "description": rule_row["description"],
+        "commentaires": [{"id": cr["id"], "auteur": cr["auteur"], "date": cr["date"], "texte": cr["texte"]}
+                          for _, cr in crows.iterrows()],
+    }
 
 
 def load_rules(data_dir: Path) -> list[dict]:
-    return _load(data_dir)
+    _ensure_initialized(data_dir)
+    rules_df = _read_table(_rules_path(data_dir), RULES_COLUMNS)
+    params_df = _read_table(_parametres_path(data_dir), PARAMETRES_COLUMNS)
+    comments_df = _read_table(_commentaires_path(data_dir), COMMENTAIRES_COLUMNS)
+    return [_rule_dict(r, params_df, comments_df) for _, r in rules_df.iterrows()]
 
 
 def update_rule(data_dir: Path, rule_id: str, titre: str | None = None,
@@ -339,28 +409,39 @@ def update_rule(data_dir: Path, rule_id: str, titre: str | None = None,
     l'interface (qui ne touche que titre/logique/description) — c'est le
     point d'entrée pour un futur script qui ajusterait les conditions
     machine-lisibles d'une règle."""
-    rules = _load(data_dir)
-    rule = next((r for r in rules if r["id"] == rule_id), None)
-    if rule is None:
+    _ensure_initialized(data_dir)
+    rules_df = _read_table(_rules_path(data_dir), RULES_COLUMNS)
+    idx = rules_df.index[rules_df["id"] == rule_id]
+    if len(idx) == 0:
         raise KeyError(rule_id)
+    i = idx[0]
     if titre is not None:
-        rule["titre"] = titre
+        rules_df.at[i, "titre"] = titre
     if logique is not None:
-        rule["logique"] = logique
+        rules_df.at[i, "logique"] = logique
     if description is not None:
-        rule["description"] = description
+        rules_df.at[i, "description"] = description
+    _save_rules_table(data_dir, rules_df)
+
+    params_df = _read_table(_parametres_path(data_dir), PARAMETRES_COLUMNS)
     if parametres is not None:
-        rule["parametres"] = parametres
-    _save(data_dir, rules)
-    return rule
+        params_df = params_df[params_df["rule_id"] != rule_id]
+        new_rows = [_condition_to_row(rule_id, ordre, cond) for ordre, cond in enumerate(parametres)]
+        params_df = pd.concat([params_df, pd.DataFrame(new_rows, columns=PARAMETRES_COLUMNS)], ignore_index=True)
+        _save_parametres_table(data_dir, params_df)
+
+    comments_df = _read_table(_commentaires_path(data_dir), COMMENTAIRES_COLUMNS)
+    return _rule_dict(rules_df.loc[i], params_df, comments_df)
 
 
 def add_comment(data_dir: Path, rule_id: str, auteur: str, texte: str) -> dict:
-    rules = _load(data_dir)
-    rule = next((r for r in rules if r["id"] == rule_id), None)
-    if rule is None:
+    _ensure_initialized(data_dir)
+    rules_df = _read_table(_rules_path(data_dir), RULES_COLUMNS)
+    if rule_id not in rules_df["id"].values:
         raise KeyError(rule_id)
-    comment = {"id": secrets.token_hex(4), "auteur": auteur, "date": _now(), "texte": texte}
-    rule.setdefault("commentaires", []).append(comment)
-    _save(data_dir, rules)
-    return comment
+    comment = {"id": secrets.token_hex(4), "rule_id": rule_id, "auteur": auteur,
+               "date": _now(), "texte": texte}
+    path = _commentaires_path(data_dir)
+    df_row = pd.DataFrame([comment], columns=COMMENTAIRES_COLUMNS)
+    df_row.to_csv(path, mode="a", header=not path.exists(), index=False)
+    return {"id": comment["id"], "auteur": auteur, "date": comment["date"], "texte": texte}
