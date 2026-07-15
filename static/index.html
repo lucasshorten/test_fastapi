@@ -419,10 +419,16 @@ function daysBetween(d1, d2) { return Math.max(1, Math.round((new Date(d2) - new
 
 function highlightTerm(text, term) {
   if (!text) return "";
+  if (!term) return text;
   return text.split(term).join(`<mark>${term}</mark>`);
 }
-function highlightExcerpt(doc) { return doc ? highlightTerm(doc.excerpt, doc.highlight) : ""; }
-function highlightFullText(doc) { return doc ? highlightTerm(doc.fullText || doc.excerpt, doc.highlight) : ""; }
+function highlightTerms(text, terms) {
+  if (!text) return "";
+  if (!terms || !terms.length) return text;
+  return terms.reduce((acc, term) => highlightTerm(acc, term), text);
+}
+function highlightExcerpt(doc) { return doc ? highlightTerms(doc.excerpt, doc.highlights) : ""; }
+function highlightFullText(doc) { return doc ? highlightTerms(doc.fullText || doc.excerpt, doc.highlights) : ""; }
 
 function confClass(c) { return c >= 85 ? "conf-high" : c >= 65 ? "conf-mid" : "conf-low"; }
 
@@ -444,10 +450,11 @@ function bioStatus(key, raw) {
 }
 function statusDot(status) { return `<span class="marker-dot" style="background:${STATUS_COLOR[status]}"></span>`; }
 
-function sourceInfo(source) {
+function sourceInfo(source, highlight) {
   if (source.kind === "document") {
     const doc = docById(source.id);
-    return { label: `${doc.titre} (${doc.date})`, html: highlightExcerpt(doc) };
+    return { label: `${doc.titre} (${doc.date})`,
+      html: highlight ? highlightTerm(doc.excerpt, highlight) : highlightExcerpt(doc) };
   }
   if (source.kind === "fiche") {
     const f = ficheById(source.id);
@@ -465,7 +472,7 @@ function sourceInfo(source) {
 function addManualCode(code, libelle, type) {
   sejour().codesValides.push({
     id: "manual" + (manualCodeCounter++), code, libelle, type,
-    notePar: "Vous", date: new Date().toISOString().slice(0,10), removed: false, manuel: true
+    date: new Date().toISOString().slice(0,10), removed: false, manuel: true
   });
 }
 
@@ -507,6 +514,7 @@ function matchingPatients() {
   if (!q) return list;
   return list.filter(p => {
     const main = p.sejours[p.sejourOrder[0]];
+    if (!main) return p.identity.id.toLowerCase().includes(q);
     return p.identity.id.toLowerCase().includes(q) || main.service.toLowerCase().includes(q) || main.motif.toLowerCase().includes(q);
   });
 }
@@ -518,8 +526,8 @@ function renderSearchDropdown() {
     ${matches.map(p => {
       const main = p.sejours[p.sejourOrder[0]];
       return `<div class="search-result ${p.identity.id===currentPatientId?'current':''}" data-action="select-patient" data-id="${p.identity.id}">
-        <span class="sr-avatar" style="background:${SERVICE_COLOR[main.service]||'#64748b'}">${p.identity.id.slice(-2)}</span>
-        <div><div class="sr-title">${p.identity.id} — ${main.service}</div><div class="sr-meta">${p.identity.sexe} · ${p.identity.age} ans · ${main.motif}</div></div>
+        <span class="sr-avatar" style="background:${main ? (SERVICE_COLOR[main.service]||'#64748b') : '#64748b'}">${p.identity.id.slice(-2)}</span>
+        <div><div class="sr-title">${p.identity.id}${main ? ` — ${main.service}` : ""}</div><div class="sr-meta">${p.identity.sexe} · ${p.identity.age} ans${main ? ` · ${main.motif}` : " · Aucun séjour"}</div></div>
       </div>`;
     }).join("")}
   </div>`;
@@ -582,8 +590,8 @@ function renderContentSearchWidget() {
 function renderTopBar() {
   const p = patient();
   const s = sejour();
-  const grad = SERVICE_GRADIENT[s.service] || "linear-gradient(135deg,#475569,#1c2b36)";
-  const accent = SERVICE_COLOR[s.service] || "#64748b";
+  const grad = s ? (SERVICE_GRADIENT[s.service] || "linear-gradient(135deg,#475569,#1c2b36)") : "linear-gradient(135deg,#475569,#1c2b36)";
+  const accent = s ? (SERVICE_COLOR[s.service] || "#64748b") : "#64748b";
   return `
     <div class="topbar" style="background:${grad}">
       <div class="topbar-row">
@@ -596,7 +604,7 @@ function renderTopBar() {
                 <span class="tp-avatar">${p.identity.id.slice(-2)}</span>
                 <div>
                   <div class="tp-id">${p.identity.id} <span class="tp-meta">${p.identity.sexe} · ${p.identity.age} ans</span></div>
-                  <div class="tp-motif">${s.service} <span class="tp-meta">· ${s.motif}</span></div>
+                  <div class="tp-motif">${s ? `${s.service} <span class="tp-meta">· ${s.motif}</span>` : `<span class="tp-meta">Aucun séjour enregistré</span>`}</div>
                 </div>
               </div>
               <button class="patient-nav-btn" data-action="next-patient" title="Patient suivant">▶</button>
@@ -750,7 +758,7 @@ function renderDocumentsList() {
         <span class="acc-meta">${formatDateFr(d.date)} · ${d.uf}</span>
       </button>
       ${open ? `<div class="acc-body">
-        <div class="doc-meta">${d.type} · ${d.auteur}</div>
+        <div class="doc-meta">${d.type}</div>
         <div class="doc-excerpt">${highlightFullText(d)}</div>
       </div>` : ""}
     </div>`;
@@ -769,9 +777,9 @@ function renderFichesList() {
         <span class="acc-meta">${formatDateFr(f.date)} · ${f.uf}</span>
       </button>
       ${open ? `<div class="acc-body">
-        <div class="doc-meta">${f.type} · ${f.auteur}</div>
+        <div class="doc-meta">${f.type}</div>
         <div class="fiche-form">
-          ${f.champs.map(c => `<div class="fiche-field"><label>${c.label}</label><div class="fiche-value">${f.highlight ? highlightTerm(c.valeur, f.highlight) : c.valeur}</div></div>`).join("")}
+          ${f.champs.map(c => `<div class="fiche-field"><label>${c.label}</label><div class="fiche-value">${highlightTerms(c.valeur, f.highlights)}</div></div>`).join("")}
         </div>
       </div>` : ""}
     </div>`;
@@ -790,8 +798,7 @@ function renderObservationsList() {
         <span class="acc-meta">${formatDateFr(o.date)} · ${o.uf}</span>
       </button>
       ${open ? `<div class="acc-body">
-        <div class="doc-meta">${o.auteur}</div>
-        <div class="doc-excerpt">${o.highlight ? highlightTerm(o.texte, o.highlight) : o.texte}</div>
+        <div class="doc-excerpt">${highlightTerms(o.texte, o.highlights)}</div>
       </div>` : ""}
     </div>`;
   }).join("");
@@ -813,7 +820,6 @@ function renderTabPanel(tab) {
       <div class="resume-grid">
         <div><span class="rg-label">Motif d'admission</span><div class="rg-value">${s.motif}</div></div>
         <div><span class="rg-label">Service</span><div class="rg-value">${s.service}</div></div>
-        <div><span class="rg-label">Praticien référent</span><div class="rg-value">${s.praticien}</div></div>
         <div><span class="rg-label">Séjour</span><div class="rg-value">${formatDateFr(s.entree)} → ${formatDateFr(s.sortie)} (${daysBetween(s.entree,s.sortie)} j)</div></div>
         <div><span class="rg-label">Patient</span><div class="rg-value">${p.identity.sexe} · ${p.identity.age} ans · ${p.identity.id}</div></div>
         <div><span class="rg-label">Dossier</span><div class="rg-value">${s.documents.length} document(s) · ${s.medicaments.length} traitement(s) · ${s.codesValides.filter(v=>!v.removed).length} code(s) validé(s)</div></div>
@@ -832,8 +838,8 @@ function renderTabPanel(tab) {
     return `<div class="tab-panel">
       ${renderParcoursPathH()}
       <table class="datatable" style="margin-top:14px">
-        <tr><th>Date</th><th>Type</th><th>Évènement</th><th>Lieu</th><th>Acteur</th><th>Détail</th></tr>
-        ${s.parcours.map(e => `<tr><td>${e.date} ${e.heure}</td><td>${e.type}</td><td>${e.titre}</td><td>${e.lieu}</td><td>${e.acteur}</td><td style="color:var(--muted);white-space:normal">${e.detail}</td></tr>`).join("")}
+        <tr><th>Date</th><th>Type</th><th>Évènement</th><th>Lieu</th><th>Détail</th></tr>
+        ${s.parcours.map(e => `<tr><td>${e.date} ${e.heure}</td><td>${e.type}</td><td>${e.titre}</td><td>${e.lieu}</td><td style="color:var(--muted);white-space:normal">${e.detail}</td></tr>`).join("")}
       </table>
     </div>`;
   }
@@ -912,7 +918,7 @@ function renderSuggestionCard(s) {
       </div>
     </div>`;
   }
-  const src = sourceInfo(s.source);
+  const src = sourceInfo(s.source, s.highlight);
   return `<div class="suggestion-card">
     <div class="row1">
       <span class="code-line">${s.code}</span>
@@ -1207,8 +1213,10 @@ function cyclePatient(dir) {
 function render() {
   const prevBar = document.querySelector(".sejours-bar");
   const scrollLeft = prevBar ? prevBar.scrollLeft : 0;
-  document.getElementById("app").innerHTML =
-    renderTopBar() + renderSejoursBar() + renderVariantI() + renderRulesModal();
+  const body = sejour()
+    ? (renderSejoursBar() + renderVariantI())
+    : `<p style="padding:32px;color:var(--muted);font-size:13.5px">Aucun séjour enregistré pour ce patient.</p>`;
+  document.getElementById("app").innerHTML = renderTopBar() + body + renderRulesModal();
   const newBar = document.querySelector(".sejours-bar");
   if (newBar) newBar.scrollLeft = scrollLeft;
 }

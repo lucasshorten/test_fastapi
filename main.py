@@ -36,10 +36,62 @@ DATA_DIR = INSTANCE_DIR / "data"
 STATIC_DIR = Path(__file__).parent / "static"
 SESSION_COOKIE = "session"
 
-TABLE_NAMES = ["patients", "sejours", "parcours", "documents", "fiches", "observations",
-               "constantes", "biologie", "medicaments", "administrations",
-               "codes_valides", "suggestions"]
-TABLES = {n: pd.read_excel(DATA_DIR / f"{n}.xlsx") for n in TABLE_NAMES}
+# Colonnes attendues par table : un fichier manquant, illisible ou avec des
+# colonnes en moins (export réel incomplet) devient un DataFrame vide mais
+# conforme à ce schéma plutôt que de faire planter le serveur au démarrage.
+TABLE_SCHEMAS = {
+    "patients": ["patient_id", "sexe", "age"],
+    "sejours": ["patient_id", "sejour_key", "ordre", "id_sejour", "service",
+                "entree", "sortie", "motif"],
+    "parcours": ["patient_id", "sejour_key", "event_id", "date", "heure", "type",
+                 "titre", "detail", "lieu"],
+    "documents": ["patient_id", "sejour_key", "doc_id", "date", "type", "titre",
+                  "uf", "excerpt", "full_text"],
+    "fiches": ["patient_id", "sejour_key", "fiche_id", "titre", "type", "date",
+               "uf", "champ_ordre", "champ_label", "champ_valeur"],
+    "observations": ["patient_id", "sejour_key", "observation_id", "date", "uf",
+                      "categorie", "texte"],
+    "constantes": ["patient_id", "sejour_key", "date", "fc", "ta", "spo2", "temp", "poids"],
+    "biologie": ["patient_id", "sejour_key", "date", "ntprobnp", "creat", "dfg",
+                 "crp", "k", "hb", "leuco", "na", "glycemie"],
+    "medicaments": ["patient_id", "sejour_key", "med_id", "nom", "dose", "voie",
+                     "frequence", "indication", "debut", "fin", "statut"],
+    "administrations": ["patient_id", "sejour_key", "med_id", "date", "heure"],
+    "codes_valides": ["patient_id", "sejour_key", "code_id", "code", "type",
+                       "libelle", "date", "removed"],
+    "suggestions": ["patient_id", "sejour_key", "suggestion_id", "code", "type",
+                     "libelle", "confiance", "source_kind", "source_id",
+                     "justification", "regle_id", "highlight"],
+}
+TABLE_NAMES = list(TABLE_SCHEMAS)
+
+
+def _load_table(name: str) -> pd.DataFrame:
+    """Charge <name>.xlsx en tolérant un fichier absent/vide/incomplet : les
+    colonnes manquantes sont ajoutées vides, et les lignes qui ne se
+    rattachent à aucun patient/séjour (identifiant manquant, ex. une ligne
+    sans séjour) sont écartées plutôt que de faire planter l'app."""
+    columns = TABLE_SCHEMAS[name]
+    path = DATA_DIR / f"{name}.xlsx"
+    if not path.exists():
+        print(f"[avertissement] {path.name} introuvable — table '{name}' vide")
+        return pd.DataFrame(columns=columns)
+    try:
+        df = pd.read_excel(path)
+    except Exception as e:
+        print(f"[avertissement] {path.name} illisible ({e}) — table '{name}' vide")
+        return pd.DataFrame(columns=columns)
+    for col in columns:
+        if col not in df.columns:
+            df[col] = pd.NA
+    if "patient_id" in df.columns:
+        df = df[df["patient_id"].notna()]
+    if "sejour_key" in df.columns:
+        df = df[df["sejour_key"].notna()]
+    return df.reset_index(drop=True)
+
+
+TABLES = {n: _load_table(n) for n in TABLE_NAMES}
 ALL_PATIENT_IDS = TABLES["patients"]["patient_id"].tolist()
 
 auth_store.init_db(INSTANCE_DIR)
@@ -117,8 +169,28 @@ def _none_if_nan(v):
     return None if pd.isna(v) else v
 
 
+def _safe_int(v, default=0):
+    if pd.isna(v):
+        return default
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_bool(v, default=False):
+    if pd.isna(v):
+        return default
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "1", "vrai", "oui", "yes")
+    return bool(v)
+
+
 def build_dossier(patient_id: str, user: str) -> dict:
-    identity_row = TABLES["patients"][TABLES["patients"]["patient_id"] == patient_id].iloc[0]
+    identity_rows = TABLES["patients"][TABLES["patients"]["patient_id"] == patient_id]
+    if identity_rows.empty:
+        raise HTTPException(status_code=404, detail="Patient introuvable")
+    identity_row = identity_rows.iloc[0]
     sejours_df = table_for("sejours", patient_id).sort_values("ordre")
     sejour_order = sejours_df["sejour_key"].tolist()
 
@@ -135,15 +207,28 @@ def build_dossier(patient_id: str, user: str) -> dict:
             rows = latest[latest["item_id"] == item_id]
             return rows.iloc[0] if not rows.empty else None
 
+        # Les passages à surligner vivent sur la suggestion elle-même (une
+        # même source peut être citée par plusieurs suggestions avec des
+        # passages différents) : on regroupe ici par source pour l'affichage
+        # "brut" d'un document/fiche/observation hors clic sur une suggestion.
+        suggestions_df = table_for("suggestions", patient_id, sk)
+        highlights_by_source = {}
+        for _, r in suggestions_df.iterrows():
+            h = _none_if_nan(r["highlight"])
+            if h:
+                highlights_by_source.setdefault((r["source_kind"], r["source_id"]), []).append(h)
+
         parcours = [
-            {"id": r["event_id"], "date": r["date"], "heure": r["heure"], "type": r["type"],
-             "titre": r["titre"], "detail": r["detail"], "lieu": r["lieu"], "acteur": r["acteur"]}
+            {"id": r["event_id"], "date": _none_if_nan(r["date"]), "heure": _none_if_nan(r["heure"]),
+             "type": _none_if_nan(r["type"]), "titre": _none_if_nan(r["titre"]),
+             "detail": _none_if_nan(r["detail"]), "lieu": _none_if_nan(r["lieu"])}
             for _, r in table_for("parcours", patient_id, sk).iterrows()
         ]
         documents = [
-            {"id": r["doc_id"], "date": r["date"], "type": r["type"], "titre": r["titre"],
-             "auteur": r["auteur"], "uf": r["uf"], "excerpt": r["excerpt"], "fullText": r["full_text"],
-             "highlight": r["highlight"]}
+            {"id": r["doc_id"], "date": _none_if_nan(r["date"]), "type": _none_if_nan(r["type"]),
+             "titre": _none_if_nan(r["titre"]), "uf": _none_if_nan(r["uf"]),
+             "excerpt": _none_if_nan(r["excerpt"]), "fullText": _none_if_nan(r["full_text"]),
+             "highlights": highlights_by_source.get(("document", r["doc_id"]), [])}
             for _, r in table_for("documents", patient_id, sk).iterrows()
         ]
         fiches = []
@@ -152,45 +237,47 @@ def build_dossier(patient_id: str, user: str) -> dict:
             frows = fiches_df[fiches_df["fiche_id"] == fid].sort_values("champ_ordre")
             first = frows.iloc[0]
             fiches.append({
-                "id": fid, "titre": first["titre"], "type": first["type"],
-                "date": first["date"], "auteur": first["auteur"], "uf": first["uf"],
-                "highlight": _none_if_nan(first["highlight"]) or "",
-                "champs": [{"label": r["champ_label"], "valeur": r["champ_valeur"]}
+                "id": fid, "titre": _none_if_nan(first["titre"]), "type": _none_if_nan(first["type"]),
+                "date": _none_if_nan(first["date"]), "uf": _none_if_nan(first["uf"]),
+                "highlights": highlights_by_source.get(("fiche", fid), []),
+                "champs": [{"label": _none_if_nan(r["champ_label"]), "valeur": _none_if_nan(r["champ_valeur"])}
                            for _, r in frows.iterrows()],
             })
         observations = [
-            {"id": r["observation_id"], "date": r["date"], "auteur": r["auteur"], "uf": r["uf"],
-             "categorie": r["categorie"], "highlight": _none_if_nan(r["highlight"]) or "",
-             "texte": r["texte"]}
+            {"id": r["observation_id"], "date": _none_if_nan(r["date"]), "uf": _none_if_nan(r["uf"]),
+             "categorie": _none_if_nan(r["categorie"]),
+             "highlights": highlights_by_source.get(("observation", r["observation_id"]), []),
+             "texte": _none_if_nan(r["texte"])}
             for _, r in table_for("observations", patient_id, sk).iterrows()
         ]
         constantes = [
-            {"date": r["date"], "fc": int(r["fc"]), "ta": r["ta"], "spo2": r["spo2"],
-             "temp": r["temp"], "poids": r["poids"]}
+            {"date": _none_if_nan(r["date"]), "fc": _safe_int(r["fc"], None), "ta": _none_if_nan(r["ta"]),
+             "spo2": _none_if_nan(r["spo2"]), "temp": _none_if_nan(r["temp"]), "poids": _none_if_nan(r["poids"])}
             for _, r in table_for("constantes", patient_id, sk).iterrows()
         ]
         biologie = [
-            {"date": r["date"], "ntprobnp": r["ntprobnp"], "creat": r["creat"], "dfg": r["dfg"],
-             "crp": r["crp"], "k": r["k"], "hb": r["hb"], "leuco": r["leuco"], "na": r["na"],
-             "glycemie": r["glycemie"]}
+            {"date": _none_if_nan(r["date"]), "ntprobnp": _none_if_nan(r["ntprobnp"]),
+             "creat": _none_if_nan(r["creat"]), "dfg": _none_if_nan(r["dfg"]), "crp": _none_if_nan(r["crp"]),
+             "k": _none_if_nan(r["k"]), "hb": _none_if_nan(r["hb"]), "leuco": _none_if_nan(r["leuco"]),
+             "na": _none_if_nan(r["na"]), "glycemie": _none_if_nan(r["glycemie"])}
             for _, r in table_for("biologie", patient_id, sk).iterrows()
         ]
         medicaments = [
-            {"id": r["med_id"], "nom": r["nom"], "dose": r["dose"], "voie": r["voie"],
-             "frequence": r["frequence"], "indication": r["indication"],
-             "prescripteur": r["prescripteur"], "debut": r["debut"],
-             "fin": _none_if_nan(r["fin"]), "statut": r["statut"]}
+            {"id": r["med_id"], "nom": _none_if_nan(r["nom"]), "dose": _none_if_nan(r["dose"]),
+             "voie": _none_if_nan(r["voie"]), "frequence": _none_if_nan(r["frequence"]),
+             "indication": _none_if_nan(r["indication"]), "debut": _none_if_nan(r["debut"]),
+             "fin": _none_if_nan(r["fin"]), "statut": _none_if_nan(r["statut"])}
             for _, r in table_for("medicaments", patient_id, sk).iterrows()
         ]
         administrations = [
-            {"medId": r["med_id"], "date": r["date"], "heure": r["heure"]}
+            {"medId": r["med_id"], "date": _none_if_nan(r["date"]), "heure": _none_if_nan(r["heure"])}
             for _, r in table_for("administrations", patient_id, sk).iterrows()
         ]
 
         codes_valides = []
         for _, r in table_for("codes_valides", patient_id, sk).iterrows():
             la = latest_for(r["code_id"])
-            code, libelle, removed = r["code"], r["libelle"], bool(r["removed"])
+            code, libelle, removed = r["code"], r["libelle"], _safe_bool(r["removed"])
             if la is not None:
                 if la["action"] == "supprimé":
                     removed = True
@@ -198,19 +285,18 @@ def build_dossier(patient_id: str, user: str) -> dict:
                     removed = False
                 elif la["action"] == "modifié":
                     code, libelle = la["code"], la["libelle"]
-            codes_valides.append({"id": r["code_id"], "code": code, "type": r["type"],
-                                   "libelle": libelle, "notePar": r["note_par"],
-                                   "date": r["date"], "removed": removed})
+            codes_valides.append({"id": r["code_id"], "code": _none_if_nan(code), "type": _none_if_nan(r["type"]),
+                                   "libelle": _none_if_nan(libelle), "date": _none_if_nan(r["date"]),
+                                   "removed": removed})
         if not latest.empty:
             manuels = latest[(latest["item_type"] == "manuel") & (latest["action"] != "supprimé")]
             for _, m in manuels.iterrows():
                 codes_valides.append({"id": m["item_id"], "code": m["code"], "type": m["type_code"],
-                                       "libelle": m["libelle"], "notePar": "Vous",
-                                       "date": str(m["timestamp"])[:10], "removed": False,
-                                       "manuel": True})
+                                       "libelle": m["libelle"], "date": str(m["timestamp"])[:10],
+                                       "removed": False, "manuel": True})
 
         suggestions = []
-        for _, r in table_for("suggestions", patient_id, sk).iterrows():
+        for _, r in suggestions_df.iterrows():
             la = latest_for(r["suggestion_id"])
             status = la["action"] if la is not None else "pending"
             code, libelle, amended = r["code"], r["libelle"], False
@@ -218,15 +304,17 @@ def build_dossier(patient_id: str, user: str) -> dict:
                 code, libelle, amended = la["code"], la["libelle"], True
             if status == "annulé":
                 status = "pending"
-            suggestions.append({"id": r["suggestion_id"], "code": code, "type": r["type"],
-                                 "libelle": libelle, "confiance": int(r["confiance"]),
+            suggestions.append({"id": r["suggestion_id"], "code": _none_if_nan(code), "type": _none_if_nan(r["type"]),
+                                 "libelle": _none_if_nan(libelle), "confiance": _safe_int(r["confiance"]),
                                  "source": {"kind": r["source_kind"], "id": r["source_id"]},
-                                 "justification": r["justification"], "status": status,
-                                 "amended": amended, "regleId": _none_if_nan(r["regle_id"])})
+                                 "justification": _none_if_nan(r["justification"]), "status": status,
+                                 "amended": amended, "regleId": _none_if_nan(r["regle_id"]),
+                                 "highlight": _none_if_nan(r["highlight"])})
 
         sejours[sk] = {
-            "idSejour": s["id_sejour"], "service": s["service"], "entree": s["entree"],
-            "sortie": s["sortie"], "motif": s["motif"], "praticien": s["praticien"],
+            "idSejour": _none_if_nan(s["id_sejour"]), "service": _none_if_nan(s["service"]),
+            "entree": _none_if_nan(s["entree"]), "sortie": _none_if_nan(s["sortie"]),
+            "motif": _none_if_nan(s["motif"]),
             "parcours": parcours, "documents": documents, "fiches": fiches, "observations": observations,
             "constantes": constantes,
             "biologie": biologie, "medicaments": medicaments, "administrations": administrations,
@@ -234,7 +322,8 @@ def build_dossier(patient_id: str, user: str) -> dict:
         }
 
     return {
-        "identity": {"id": patient_id, "sexe": identity_row["sexe"], "age": int(identity_row["age"])},
+        "identity": {"id": patient_id, "sexe": _none_if_nan(identity_row["sexe"]),
+                     "age": _safe_int(identity_row["age"])},
         "sejourOrder": sejour_order,
         "sejours": sejours,
     }
@@ -347,7 +436,7 @@ def admin_list_users(admin: dict = Depends(require_admin)):
 @app.get("/api/admin/patients")
 def admin_list_patients(admin: dict = Depends(require_admin)):
     return [
-        {"id": r["patient_id"], "sexe": r["sexe"], "age": int(r["age"])}
+        {"id": r["patient_id"], "sexe": _none_if_nan(r["sexe"]), "age": _safe_int(r["age"])}
         for _, r in TABLES["patients"].iterrows()
     ]
 

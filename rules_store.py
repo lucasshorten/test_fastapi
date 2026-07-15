@@ -298,6 +298,18 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _literal_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
+    """Affiche les champs multi-lignes (ex. "logique") en bloc littéral YAML
+    ("|") plutôt qu'en chaîne repliée entre guillemets : ça évite les
+    apostrophes doublées et les retours à la ligne forcés qui rendent le
+    fichier illisible/impraticable à modifier à la main."""
+    style = "|" if "\n" in data else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+
+yaml.add_representer(str, _literal_str_representer, Dumper=yaml.SafeDumper)
+
+
 def _load(data_dir: Path) -> list[dict]:
     path = _rules_path(data_dir)
     if not path.exists():
@@ -313,7 +325,7 @@ def _save(data_dir: Path, rules: list[dict]) -> None:
     path = _rules_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump({"rules": rules}, f, allow_unicode=True, sort_keys=False)
+        yaml.safe_dump({"rules": rules}, f, allow_unicode=True, sort_keys=False, width=4096)
 
 
 def load_rules(data_dir: Path) -> list[dict]:

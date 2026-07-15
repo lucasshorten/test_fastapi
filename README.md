@@ -297,6 +297,18 @@ fréquence de chaque médicament — voir `generate_sample_data.py`).
 `generate_sample_data.py` reprend les données fictives de votre prototype ;
 remplacez-le par votre export réel en gardant les mêmes colonnes.
 
+Aucune table ne conserve de nom d'intervenant (médecin, IDE,
+kinésithérapeute...) : ce ne sont pas des colonnes nécessaires au codage et
+elles ne doivent pas être exportées.
+
+Le backend (`main.py`) tolère un export réel incomplet : un fichier
+`.xlsx` absent ou totalement vide devient une table vide (pas de crash au
+démarrage), et une ligne qui ne se rattache à aucun patient/séjour
+(`patient_id` ou `sejour_key` manquant) est simplement ignorée plutôt que de
+faire planter la construction d'un dossier. Un patient sans aucun séjour
+valide s'affiche normalement dans la liste, avec un message « Aucun séjour
+enregistré » à la place du dossier.
+
 ### CSV (écriture) dans `<instance>/data/annotations/`
 Un fichier `annotations_<nom_utilisateur>.csv` par annotateur → aucune
 écriture concurrente possible même si plusieurs personnes valident des
@@ -355,6 +367,23 @@ for rule in rules:
 Ce n'est pas un moteur de règles branché sur la génération des suggestions
 (volontairement — voir plus haut), juste un format prêt à être consommé par
 un futur script d'automatisation.
+
+`rules.yaml` est écrit dans un format pensé pour rester lisible/modifiable
+à la main : les champs multi-lignes (`logique`) utilisent le style bloc
+YAML (`|`) plutôt que des chaînes repliées entre guillemets, ce qui évite
+les apostrophes doublées et les retours à la ligne forcés en plein milieu
+d'une phrase.
+
+### Passages surlignés (`highlight`) dans `suggestions.xlsx`
+Le passage à surligner dans un document/une fiche/une observation quand on
+clique sur la source d'une suggestion (📎) est porté par la suggestion
+elle-même (colonne `highlight` de `suggestions.xlsx`), pas par sa source :
+une même source (ex. un compte-rendu) peut être citée par plusieurs
+suggestions différentes, chacune avec son propre passage pertinent. Vide
+(cellule non renseignée) pour les suggestions dont la source est un
+événement du parcours, jamais surligné dans l'interface. En dehors d'un clic
+sur une suggestion précise, un document/une fiche/une observation affiche
+l'ensemble des passages de toutes les suggestions qui le citent.
 
 ## Limites assumées
 
