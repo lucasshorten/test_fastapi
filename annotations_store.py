@@ -44,11 +44,14 @@ def user_file(data_dir: Path, user: str) -> Path:
     return _annotations_dir(data_dir) / _safe_filename(user)
 
 
+_ID_COLUMNS = {"patient_id", "sejour_key", "item_id"}
+
+
 def load_user_annotations(data_dir: Path, user: str) -> pd.DataFrame:
     path = user_file(data_dir, user)
     if not path.exists():
         return pd.DataFrame(columns=COLUMNS)
-    return pd.read_csv(path)
+    return pd.read_csv(path, dtype={c: str for c in _ID_COLUMNS})
 
 
 def append_annotation(data_dir: Path, user: str, patient_id: str, sejour_key: str, item_type: str,
@@ -88,7 +91,7 @@ def load_all_annotations(data_dir: Path) -> pd.DataFrame:
     frames = []
     for f in _annotations_dir(data_dir).glob("annotations_*.csv"):
         try:
-            frames.append(pd.read_csv(f))
+            frames.append(pd.read_csv(f, dtype={c: str for c in _ID_COLUMNS}))
         except pd.errors.EmptyDataError:
             continue
     if not frames:

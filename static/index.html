@@ -814,8 +814,8 @@ function renderTabPanel(tab) {
   const p = patient();
   const s = sejour();
   if (tab === "resume") {
-    const lastB = s.biologie[s.biologie.length-1];
-    const lastC = s.constantes[s.constantes.length-1];
+    const lastB = s.biologie.length ? s.biologie[s.biologie.length-1] : null;
+    const lastC = s.constantes.length ? s.constantes[s.constantes.length-1] : null;
     return `<div class="tab-panel">
       <div class="resume-grid">
         <div><span class="rg-label">Motif d'admission</span><div class="rg-value">${s.motif}</div></div>
@@ -825,12 +825,14 @@ function renderTabPanel(tab) {
         <div><span class="rg-label">Dossier</span><div class="rg-value">${s.documents.length} document(s) · ${s.medicaments.length} traitement(s) · ${s.codesValides.filter(v=>!v.removed).length} code(s) validé(s)</div></div>
       </div>
       <h4 style="margin:16px 0 8px">Constantes &amp; biologie (dernier relevé)</h4>
+      ${lastC ? `
       <div class="marker-row">${statusDot(vitalStatus('fc', lastC.fc))} FC ${lastC.fc} bpm</div>
       <div class="marker-row">${statusDot(vitalStatus('ta', lastC.ta))} TA ${lastC.ta} mmHg</div>
-      <div class="marker-row">${statusDot(vitalStatus('spo2', lastC.spo2))} SpO2 ${lastC.spo2}</div>
+      <div class="marker-row">${statusDot(vitalStatus('spo2', lastC.spo2))} SpO2 ${lastC.spo2}</div>` : `<p style="color:var(--muted);font-size:12.5px">Aucune constante enregistrée pour ce séjour.</p>`}
+      ${lastB ? `
       <div class="marker-row">${statusDot(bioStatus('ntprobnp', lastB.ntprobnp))} NT-proBNP ${lastB.ntprobnp}</div>
       <div class="marker-row">${statusDot(bioStatus('dfg', lastB.dfg))} DFG ${lastB.dfg}</div>
-      <div class="marker-row">${statusDot(bioStatus('crp', lastB.crp))} CRP ${lastB.crp}</div>
+      <div class="marker-row">${statusDot(bioStatus('crp', lastB.crp))} CRP ${lastB.crp}</div>` : `<p style="color:var(--muted);font-size:12.5px">Aucune biologie enregistrée pour ce séjour.</p>`}
       <p style="color:var(--muted);margin-top:10px">Identifiant d'étude ${p.identity.id} — dossier de recherche anonymisé.</p>
     </div>`;
   }

@@ -66,6 +66,21 @@ TABLE_SCHEMAS = {
 TABLE_NAMES = list(TABLE_SCHEMAS)
 
 
+def _to_id_str(v):
+    """Normalise un identifiant Excel en str : un identifiant numérique
+    (patient_id, sejour_key, ...) est lu par pandas en int64/float64 (float
+    dès qu'une valeur manque dans la colonne), ce qui ne correspond plus aux
+    identifiants str utilisés côté API/frontend et casse les comparaisons
+    ("42" != 42) et la sélection de séjour côté JS. On force donc tout en
+    str, en évitant le suffixe ".0" que pandas ajoute aux entiers passés en
+    float."""
+    if pd.isna(v):
+        return v
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+
 def _load_table(name: str) -> pd.DataFrame:
     """Charge <name>.xlsx en tolérant un fichier absent/vide/incomplet : les
     colonnes manquantes sont ajoutées vides, et les lignes qui ne se
@@ -84,6 +99,9 @@ def _load_table(name: str) -> pd.DataFrame:
     for col in columns:
         if col not in df.columns:
             df[col] = pd.NA
+    for col in columns:
+        if col.endswith("_id") or col.endswith("_key"):
+            df[col] = df[col].map(_to_id_str)
     if "patient_id" in df.columns:
         df = df[df["patient_id"].notna()]
     if "sejour_key" in df.columns:
