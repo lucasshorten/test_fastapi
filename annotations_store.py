@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 COLUMNS = [
-    "timestamp", "user", "patient_id", "sejour_key",
+    "timestamp", "user", "patient_id", "id_sejour",
     "item_type",   # "suggestion" | "code_valide" | "manuel"
     "item_id",
     "action",      # "validé" | "rejeté" | "annulé" | "modifié" | "ajouté" | "supprimé" | "restauré"
@@ -44,7 +44,7 @@ def user_file(data_dir: Path, user: str) -> Path:
     return _annotations_dir(data_dir) / _safe_filename(user)
 
 
-_ID_COLUMNS = {"patient_id", "sejour_key", "item_id"}
+_ID_COLUMNS = {"patient_id", "id_sejour", "item_id"}
 
 
 def load_user_annotations(data_dir: Path, user: str) -> pd.DataFrame:
@@ -54,12 +54,12 @@ def load_user_annotations(data_dir: Path, user: str) -> pd.DataFrame:
     return pd.read_csv(path, dtype={c: str for c in _ID_COLUMNS})
 
 
-def append_annotation(data_dir: Path, user: str, patient_id: str, sejour_key: str, item_type: str,
+def append_annotation(data_dir: Path, user: str, patient_id: str, id_sejour: str, item_type: str,
                        item_id: str, action: str, code: str = "", libelle: str = "",
                        type_code: str = "", commentaire: str = "") -> None:
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "user": user, "patient_id": patient_id, "sejour_key": sejour_key,
+        "user": user, "patient_id": patient_id, "id_sejour": id_sejour,
         "item_type": item_type, "item_id": item_id, "action": action,
         "code": code, "libelle": libelle, "type_code": type_code, "commentaire": commentaire,
     }
@@ -72,12 +72,12 @@ def new_manual_id() -> str:
     return f"manuel-{uuid.uuid4().hex[:8]}"
 
 
-def latest_actions(user_annotations: pd.DataFrame, patient_id: str, sejour_key: str) -> pd.DataFrame:
+def latest_actions(user_annotations: pd.DataFrame, patient_id: str, id_sejour: str) -> pd.DataFrame:
     """Renvoie, pour chaque item_id du séjour, sa dernière action connue pour cet utilisateur."""
     if user_annotations.empty:
         return user_annotations
     subset = user_annotations[
-        (user_annotations["patient_id"] == patient_id) & (user_annotations["sejour_key"] == sejour_key)
+        (user_annotations["patient_id"] == patient_id) & (user_annotations["id_sejour"] == id_sejour)
     ].copy()
     if subset.empty:
         return subset

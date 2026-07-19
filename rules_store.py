@@ -76,9 +76,8 @@ DEFAULT_RULES = [
             "La prescription d'insuline pendant le séjour est un signal fort de "
             "diabète, même si le diagnostic n'a été formulé dans aucun "
             "compte-rendu. Le code ATC du médicament (pas seulement son nom "
-            "commercial) est utilisé pour rester robuste aux génériques. "
-            "Nécessite une colonne `atc` sur la table medicaments (absente du "
-            "jeu de données fictif actuel — voir README)."
+            "commercial) est utilisé pour rester robuste aux génériques (colonne "
+            "`atc` de la table medicaments)."
         ),
         "commentaires": [],
     },

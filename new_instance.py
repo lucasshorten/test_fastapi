@@ -26,7 +26,7 @@ MANIFEST_PATH = ROOT / "instances.json"
 
 # Doit rester synchronisé avec TABLE_NAMES dans main.py.
 REQUIRED_TABLES = ["patients", "sejours", "parcours", "documents", "fiches", "observations",
-                   "constantes", "biologie", "medicaments", "administrations",
+                   "constantes", "biologie", "medicaments",
                    "codes_valides", "suggestions"]
 
 

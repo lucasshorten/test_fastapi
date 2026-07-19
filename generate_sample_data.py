@@ -7,19 +7,22 @@ les mêmes fichiers Excel (mêmes noms de colonnes / tables).
 
 Tables produites dans data/ :
     patients.xlsx
-    sejours.xlsx
+    sejours.xlsx          (id_sejour identifie le séjour, aucune autre clé)
     parcours.xlsx
-    documents.xlsx
-    fiches.xlsx           (fiches de liaison/suivi remplies, une ligne par champ)
-    observations.xlsx     (observations médicales du patient)
+    documents.xlsx         (peut exister hors séjour : id_sejour vide)
+    fiches.xlsx            (fiches de liaison/suivi remplies, une ligne par champ ;
+                             peut exister hors séjour : id_sejour vide)
+    observations.xlsx      (observations médicales du patient ; peut exister
+                             hors séjour : id_sejour vide)
     constantes.xlsx
-    biologie.xlsx
-    medicaments.xlsx
-    administrations.xlsx  (prises effectives de chaque médicament, une ligne par prise)
-    codes_valides.xlsx   (codage déjà posé par le clinicien, référence)
-    suggestions.xlsx     (suggestions de codage à valider/rejeter/modifier, portent
-                          aussi le passage à surligner dans leur source — voir
-                          "highlight" ci-dessous)
+    biologie.xlsx           (une ligne par mesure : patient_id, id_sejour, date,
+                             code, valeur, unite — format long)
+    medicaments.xlsx        (une ligne par prise effective de médicament : nom,
+                             qté, unité, atc, ucd, date_administration)
+    codes_valides.xlsx      (codage déjà posé par le clinicien, référence)
+    suggestions.xlsx        (suggestions de codage à valider/rejeter/modifier, portent
+                             aussi le passage à surligner dans leur source — voir
+                             "highlight" ci-dessous)
 
 Aucune de ces tables ne conserve de nom d'intervenant (médecin, IDE,
 kinésithérapeute...) : ce n'est pas nécessaire au codage et ces données sont
@@ -34,6 +37,22 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
+# Code ATC + code UCD (fictifs pour UCD) de chaque médicament utilisé dans le
+# jeu de données — une ligne par prise effective porte ces deux codes.
+ATC_UCD_BY_DRUG = {
+    "Furosémide": ("C03CA01", "9200001"),
+    "Ramipril": ("C09AA05", "9200002"),
+    "Héparine": ("B01AB01", "9200003"),
+    "Aspirine": ("B01AC06", "9200004"),
+    "Clopidogrel": ("B01AC04", "9200005"),
+    "Amoxicilline / Ac. clavulanique": ("J01CR02", "9200006"),
+    "Amoxicilline": ("J01CA04", "9200007"),
+    "Rivaroxaban": ("B01AF01", "9200008"),
+    "Paracétamol": ("N02BE01", "9200009"),
+}
+
+BIOLOGIE_CODES = ["ntprobnp", "creat", "dfg", "crp", "k", "hb", "leuco", "na", "glycemie"]
+
 PATIENTS = {
     "REC-2024-00187": {
         "sexe": "F", "age": 67,
@@ -42,14 +61,13 @@ PATIENTS = {
             "sej1": {
                 "id_sejour": "ID0000123", "service": "Cardiologie",
                 "entree": "2024-05-02", "sortie": "2024-05-14",
-                "motif": "Décompensation cardiaque globale",
                 "parcours": [
-                    ("pe1", "2024-05-02", "08:14", "Admission", "Entrée via urgences", "Dyspnée aiguë de repos, orthopnée.", "Urgences"),
-                    ("pe2", "2024-05-02", "14:30", "Mouvement", "Transfert en Cardiologie", "Hospitalisation conventionnelle, surveillance scope.", "Cardiologie — Ch. 214"),
-                    ("pe3", "2024-05-03", "09:00", "Acte", "Échocardiographie transthoracique", "FEVG estimée à 30%, hypokinésie globale.", "Plateau technique cardio"),
-                    ("pe4", "2024-05-05", "11:00", "Acte", "Pose de sonde vésicale à demeure", "Surveillance diurèse dans un contexte d'insuffisance rénale aiguë.", "Cardiologie — Ch. 214"),
-                    ("pe5", "2024-05-08", "10:00", "Consultation", "Consultation cardiologique de suivi", "Ajustement du traitement diurétique, poids stable.", "Cardiologie"),
-                    ("pe6", "2024-05-14", "10:00", "Sortie", "Retour à domicile avec HAD", "Sortie avec surveillance infirmière à domicile.", "Cardiologie"),
+                    ("pe1", "2024-05-02", "08:14", "Admission", "Entrée via urgences", "Dyspnée aiguë de repos, orthopnée.", "UF Urgences"),
+                    ("pe2", "2024-05-02", "14:30", "Mouvement", "Transfert en Cardiologie", "Hospitalisation conventionnelle, surveillance scope.", "UF Cardiologie"),
+                    ("pe3", "2024-05-03", "09:00", "Acte", "Échocardiographie transthoracique", "FEVG estimée à 30%, hypokinésie globale.", "UF Imagerie cardiaque"),
+                    ("pe4", "2024-05-05", "11:00", "Acte", "Pose de sonde vésicale à demeure", "Surveillance diurèse dans un contexte d'insuffisance rénale aiguë.", "UF Cardiologie"),
+                    ("pe5", "2024-05-08", "10:00", "Consultation", "Consultation cardiologique de suivi", "Ajustement du traitement diurétique, poids stable.", "UF Cardiologie"),
+                    ("pe6", "2024-05-14", "10:00", "Sortie", "Retour à domicile avec HAD", "Sortie avec surveillance infirmière à domicile.", "UF Cardiologie"),
                 ],
                 "documents": [
                     ("doc1", "2024-05-14", "Compte-rendu d'hospitalisation", "CRH — Séjour Cardiologie", "UF Cardiologie",
@@ -96,9 +114,9 @@ PATIENTS = {
                     ("10/05", "1450 ng/L", "110 µmol/L", "44 mL/min", "8 mg/L", "3.9 mmol/L", "11.9 g/dL", "7.2 G/L", "139 mmol/L", "5.7 mmol/L"),
                 ],
                 "medicaments": [
-                    ("m1", "Furosémide", "40mg", "IV", "2x/jour", "Décompensation cardiaque", "2024-05-02", None, "en cours"),
-                    ("m2", "Ramipril", "5mg", "orale", "1x/jour", "Insuffisance cardiaque", "2024-05-06", None, "en cours"),
-                    ("m3", "Héparine", "5000UI", "SC", "3x/jour", "Prévention thrombo-embolique", "2024-05-02", "2024-05-10", "arrêté"),
+                    ("Furosémide", 40, "mg", "2x/jour", "2024-05-02", None),
+                    ("Ramipril", 5, "mg", "1x/jour", "2024-05-06", None),
+                    ("Héparine", 5000, "UI", "3x/jour", "2024-05-02", "2024-05-10"),
                 ],
                 "codes_valides": [
                     ("v1", "I50.0", "CIM-10", "Insuffisance cardiaque congestive", "2024-05-14", False),
@@ -128,11 +146,10 @@ PATIENTS = {
             "sej0": {
                 "id_sejour": "ID0000098", "service": "Cardiologie",
                 "entree": "2023-11-10", "sortie": "2023-11-13",
-                "motif": "Bilan de douleur thoracique d'effort",
                 "parcours": [
-                    ("pe1", "2023-11-10", "09:00", "Admission", "Entrée programmée — bilan douleur thoracique", "Douleur thoracique d'effort depuis 3 semaines.", "Cardiologie"),
-                    ("pe2", "2023-11-11", "09:00", "Acte", "Coronarographie diagnostique", "Sténose serrée de l'IVA proximale, pose d'un stent actif.", "Salle de cathétérisme"),
-                    ("pe3", "2023-11-13", "10:00", "Sortie", "Retour à domicile", "Sortie sous double antiagrégation plaquettaire.", "Cardiologie"),
+                    ("pe1", "2023-11-10", "09:00", "Admission", "Entrée programmée — bilan douleur thoracique", "Douleur thoracique d'effort depuis 3 semaines.", "UF Cardiologie"),
+                    ("pe2", "2023-11-11", "09:00", "Acte", "Coronarographie diagnostique", "Sténose serrée de l'IVA proximale, pose d'un stent actif.", "UF Cardiologie interventionnelle"),
+                    ("pe3", "2023-11-13", "10:00", "Sortie", "Retour à domicile", "Sortie sous double antiagrégation plaquettaire.", "UF Cardiologie"),
                 ],
                 "documents": [
                     ("doc1", "2023-11-11", "Compte-rendu d'examen", "CR Coronarographie", "UF Cardiologie interventionnelle",
@@ -147,8 +164,8 @@ PATIENTS = {
                     ("10/11", "210 ng/L", "78 µmol/L", "80 mL/min", "4 mg/L", "4.2 mmol/L", "13.1 g/dL", "6.8 G/L", "140 mmol/L", "5.4 mmol/L"),
                 ],
                 "medicaments": [
-                    ("m1", "Aspirine", "75mg", "orale", "1x/jour", "Post-angioplastie", "2023-11-11", None, "en cours"),
-                    ("m2", "Clopidogrel", "75mg", "orale", "1x/jour", "Double antiagrégation (12 mois)", "2023-11-11", "2024-11-11", "en cours"),
+                    ("Aspirine", 75, "mg", "1x/jour", "2023-11-11", None),
+                    ("Clopidogrel", 75, "mg", "1x/jour", "2023-11-11", "2024-11-11"),
                 ],
                 "codes_valides": [
                     ("v1", "I25.1", "CIM-10", "Maladie coronarienne athéroscléreuse", "2023-11-11", False),
@@ -160,6 +177,19 @@ PATIENTS = {
                 ],
             },
         },
+        # Documents/observations "hors séjour" : rattachés au patient, pas à
+        # un séjour précis — affichés dans un encart fixe de l'onglet Documents.
+        "hors_sejour": {
+            "documents": [
+                ("hdoc1", "2022-09-14", "Courrier de médecin traitant", "Courrier d'adressage en cardiologie", "UF Médecine générale",
+                 "Patiente adressée pour bilan de dyspnée d'effort évoluant depuis plusieurs mois, dans un contexte de cardiopathie ischémique connue.",
+                 "Patiente adressée pour bilan de dyspnée d'effort évoluant depuis plusieurs mois, dans un contexte de cardiopathie ischémique connue.\nAntécédents : hypertension artérielle, dyslipidémie.\nTraitement actuel : bêta-bloquant, statine.\nMerci de votre avis spécialisé."),
+            ],
+            "observations": [
+                ("hobs1", "2022-09-20", "UF Cardiologie", "Consultation",
+                 "Consultation de suivi ambulatoire, patiente stable, pas de décompensation depuis la dernière hospitalisation."),
+            ],
+        },
     },
 
     "REC-2024-00099": {
@@ -169,13 +199,12 @@ PATIENTS = {
             "sej1": {
                 "id_sejour": "ID0000201", "service": "Pneumologie",
                 "entree": "2024-04-10", "sortie": "2024-04-16",
-                "motif": "Pneumopathie aiguë communautaire",
                 "parcours": [
-                    ("pe1", "2024-04-10", "20:10", "Admission", "Entrée via urgences", "Fièvre à 39.2°C, toux productive, douleur basithoracique droite.", "Urgences"),
-                    ("pe2", "2024-04-10", "21:00", "Acte", "Radiographie thoracique", "Recherche d'un foyer infectieux.", "Imagerie"),
-                    ("pe3", "2024-04-11", "08:00", "Acte", "Antibiothérapie IV initiée", "Amoxicilline-acide clavulanique.", "Pneumologie"),
-                    ("pe4", "2024-04-14", "09:30", "Consultation", "Réévaluation clinique", "Apyrexie depuis 48h, amélioration respiratoire.", "Pneumologie"),
-                    ("pe5", "2024-04-16", "10:00", "Sortie", "Retour à domicile", "Relais par antibiothérapie orale.", "Pneumologie"),
+                    ("pe1", "2024-04-10", "20:10", "Admission", "Entrée via urgences", "Fièvre à 39.2°C, toux productive, douleur basithoracique droite.", "UF Urgences"),
+                    ("pe2", "2024-04-10", "21:00", "Acte", "Radiographie thoracique", "Recherche d'un foyer infectieux.", "UF Imagerie"),
+                    ("pe3", "2024-04-11", "08:00", "Acte", "Antibiothérapie IV initiée", "Amoxicilline-acide clavulanique.", "UF Pneumologie"),
+                    ("pe4", "2024-04-14", "09:30", "Consultation", "Réévaluation clinique", "Apyrexie depuis 48h, amélioration respiratoire.", "UF Pneumologie"),
+                    ("pe5", "2024-04-16", "10:00", "Sortie", "Retour à domicile", "Relais par antibiothérapie orale.", "UF Pneumologie"),
                 ],
                 "documents": [
                     ("doc1", "2024-04-16", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie", "UF Pneumologie",
@@ -207,7 +236,7 @@ PATIENTS = {
                     ("14/04", "80 ng/L", "68 µmol/L", "90 mL/min", "24 mg/L", "4.0 mmol/L", "12.4 g/dL", "8.9 G/L", "138 mmol/L", "5.5 mmol/L"),
                 ],
                 "medicaments": [
-                    ("m1", "Amoxicilline / Ac. clavulanique", "1g/125mg", "IV puis orale", "3x/jour", "Pneumopathie bactérienne", "2024-04-11", "2024-04-16", "arrêté"),
+                    ("Amoxicilline / Ac. clavulanique", 1, "g", "3x/jour", "2024-04-11", "2024-04-16"),
                 ],
                 "codes_valides": [
                     ("v1", "J15.9", "CIM-10", "Pneumopathie bactérienne, sans précision", "2024-04-16", False),
@@ -224,11 +253,10 @@ PATIENTS = {
             "sej0": {
                 "id_sejour": "ID0000077", "service": "Pneumologie",
                 "entree": "2023-03-05", "sortie": "2023-03-09",
-                "motif": "Pneumopathie aiguë communautaire (épisode antérieur)",
                 "parcours": [
-                    ("pe1", "2023-03-05", "18:40", "Admission", "Entrée via urgences", "Fièvre et toux productive depuis 2 jours.", "Urgences"),
-                    ("pe2", "2023-03-06", "08:30", "Acte", "Radiographie thoracique", "Foyer basal gauche.", "Imagerie"),
-                    ("pe3", "2023-03-09", "10:00", "Sortie", "Retour à domicile", "Relais antibiothérapie orale.", "Pneumologie"),
+                    ("pe1", "2023-03-05", "18:40", "Admission", "Entrée via urgences", "Fièvre et toux productive depuis 2 jours.", "UF Urgences"),
+                    ("pe2", "2023-03-06", "08:30", "Acte", "Radiographie thoracique", "Foyer basal gauche.", "UF Imagerie"),
+                    ("pe3", "2023-03-09", "10:00", "Sortie", "Retour à domicile", "Relais antibiothérapie orale.", "UF Pneumologie"),
                 ],
                 "documents": [
                     ("doc1", "2023-03-09", "Compte-rendu d'hospitalisation", "CRH — Séjour Pneumologie (2023)", "UF Pneumologie",
@@ -242,13 +270,21 @@ PATIENTS = {
                     ("05/03", "85 ng/L", "66 µmol/L", "92 mL/min", "96 mg/L", "3.9 mmol/L", "12.9 g/dL", "12.1 G/L", "137 mmol/L", "5.6 mmol/L"),
                 ],
                 "medicaments": [
-                    ("m1", "Amoxicilline", "1g", "orale", "3x/jour", "Pneumopathie bactérienne", "2023-03-05", "2023-03-12", "arrêté"),
+                    ("Amoxicilline", 1, "g", "3x/jour", "2023-03-05", "2023-03-12"),
                 ],
                 "codes_valides": [
                     ("v1", "J18.9", "CIM-10", "Pneumopathie, sans précision", "2023-03-09", False),
                 ],
                 "suggestions": [],
             },
+        },
+        "hors_sejour": {
+            "fiches": [
+                ("hf1", "Fiche de coordination ville-hôpital", "Coordination", "2024-01-15", "UF Pneumologie", [
+                    ("Médecin traitant", "Dr Martin, cabinet de Belleville"),
+                    ("Pathologie de fond", "BPCO stade II"),
+                ]),
+            ],
         },
     },
 
@@ -259,13 +295,12 @@ PATIENTS = {
             "sej1": {
                 "id_sejour": "ID0000156", "service": "Chirurgie orthopédique",
                 "entree": "2024-06-01", "sortie": "2024-06-07",
-                "motif": "Prothèse totale de hanche droite",
                 "parcours": [
-                    ("pe1", "2024-06-01", "07:30", "Admission", "Entrée en hospitalisation programmée", "Admission la veille de l'intervention, à jeun.", "Chirurgie orthopédique"),
-                    ("pe2", "2024-06-01", "10:00", "Acte", "Pose de prothèse totale de hanche", "Voie d'abord postéro-externe, sans complication peropératoire.", "Bloc opératoire"),
-                    ("pe3", "2024-06-02", "09:00", "Consultation", "Visite post-opératoire J1", "Douleur contrôlée, début de la rééducation.", "Chirurgie orthopédique"),
-                    ("pe4", "2024-06-04", "14:00", "Acte", "Séance de kinésithérapie", "Reprise de l'appui partiel.", "Plateau de rééducation"),
-                    ("pe5", "2024-06-07", "11:00", "Sortie", "Sortie vers centre de rééducation", "Transfert en SSR pour poursuite de la rééducation.", "Chirurgie orthopédique"),
+                    ("pe1", "2024-06-01", "07:30", "Admission", "Entrée en hospitalisation programmée", "Admission la veille de l'intervention, à jeun.", "UF Chirurgie orthopédique"),
+                    ("pe2", "2024-06-01", "10:00", "Acte", "Pose de prothèse totale de hanche", "Voie d'abord postéro-externe, sans complication peropératoire.", "UF Bloc opératoire"),
+                    ("pe3", "2024-06-02", "09:00", "Consultation", "Visite post-opératoire J1", "Douleur contrôlée, début de la rééducation.", "UF Chirurgie orthopédique"),
+                    ("pe4", "2024-06-04", "14:00", "Acte", "Séance de kinésithérapie", "Reprise de l'appui partiel.", "UF Rééducation"),
+                    ("pe5", "2024-06-07", "11:00", "Sortie", "Sortie vers centre de rééducation", "Transfert en SSR pour poursuite de la rééducation.", "UF Chirurgie orthopédique"),
                 ],
                 "documents": [
                     ("doc1", "2024-06-01", "Compte-rendu opératoire", "CR Opératoire — PTH droite", "UF Bloc opératoire",
@@ -295,8 +330,8 @@ PATIENTS = {
                     ("06/06", "160 ng/L", "84 µmol/L", "75 mL/min", "58 mg/L", "4.0 mmol/L", "10.9 g/dL", "9.8 G/L", "139 mmol/L", "6.0 mmol/L"),
                 ],
                 "medicaments": [
-                    ("m1", "Rivaroxaban", "10mg", "orale", "1x/jour", "Prévention thrombo-embolique post-PTH", "2024-06-01", None, "en cours"),
-                    ("m2", "Paracétamol", "1g", "orale", "4x/jour", "Antalgie post-opératoire", "2024-06-01", "2024-06-07", "arrêté"),
+                    ("Rivaroxaban", 10, "mg", "1x/jour", "2024-06-01", None),
+                    ("Paracétamol", 1, "g", "4x/jour", "2024-06-01", "2024-06-07"),
                 ],
                 "codes_valides": [
                     ("v1", "NEQK002", "CCAM", "Arthroplastie totale de hanche par voie postéro-externe", "2024-06-01", False),
@@ -315,10 +350,9 @@ PATIENTS = {
             "sej0": {
                 "id_sejour": "ID0000142", "service": "Chirurgie orthopédique",
                 "entree": "2024-05-15", "sortie": "2024-05-15",
-                "motif": "Bilan pré-opératoire prothèse de hanche",
                 "parcours": [
-                    ("pe1", "2024-05-15", "09:00", "Consultation", "Consultation chirurgicale", "Indication opératoire retenue, bilan pré-anesthésique programmé.", "Consultation ortho"),
-                    ("pe2", "2024-05-15", "10:30", "Acte", "Radiographie du bassin", "Coxarthrose sévère droite confirmée.", "Imagerie"),
+                    ("pe1", "2024-05-15", "09:00", "Consultation", "Consultation chirurgicale", "Indication opératoire retenue, bilan pré-anesthésique programmé.", "UF Chirurgie orthopédique"),
+                    ("pe2", "2024-05-15", "10:30", "Acte", "Radiographie du bassin", "Coxarthrose sévère droite confirmée.", "UF Imagerie"),
                 ],
                 "documents": [
                     ("doc1", "2024-05-15", "Compte-rendu de consultation", "CR Consultation pré-opératoire", "UF Chirurgie orthopédique",
@@ -373,14 +407,35 @@ def _daterange(start, end):
     return days
 
 
-def _generate_administrations(debut, fin, frequence, sejour_entree, sejour_sortie):
-    """Génère les prises effectives d'un médicament, bornées à la durée du séjour."""
+def _generate_medicament_rows(patient_id, id_sejour, nom, qte, unite, frequence, debut, fin,
+                               sejour_entree, sejour_sortie):
+    """Génère une ligne par prise effective d'un médicament (date_administration
+    complète), bornées à la durée du séjour."""
+    atc, ucd = ATC_UCD_BY_DRUG[nom]
     start = _clamp(debut, sejour_entree, sejour_sortie)
     end = _clamp(fin or sejour_sortie, sejour_entree, sejour_sortie)
     if end < start:
         return []
-    hours = _dose_hours(frequence)
-    return [(day, heure) for day in _daterange(start, end) for heure in hours]
+    rows = []
+    for day in _daterange(start, end):
+        for heure in _dose_hours(frequence):
+            rows.append({
+                "patient_id": patient_id, "id_sejour": id_sejour, "nom": nom,
+                "qte": qte, "unite": unite, "atc": atc, "ucd": ucd,
+                "date_administration": f"{day} {heure}",
+            })
+    return rows
+
+
+def _split_valeur_unite(raw):
+    """Sépare une valeur de biologie du prototype (ex: "5400 ng/L") en un
+    nombre et une unité, pour coller au format long (code/valeur/unite)."""
+    m = re.match(r"([\d.]+)\s*(.*)", raw)
+    if not m:
+        return raw, ""
+    nombre = m.group(1)
+    valeur = float(nombre) if "." in nombre else int(nombre)
+    return valeur, m.group(2)
 
 
 def build_tables():
@@ -388,7 +443,7 @@ def build_tables():
     parcours_rows, documents_rows = [], []
     fiches_rows, observations_rows = [], []
     constantes_rows, biologie_rows = [], []
-    medicaments_rows, administrations_rows = [], []
+    medicaments_rows = []
     codes_valides_rows, suggestions_rows = [], []
 
     for patient_id, p in PATIENTS.items():
@@ -396,80 +451,93 @@ def build_tables():
 
         for ordre, sejour_key in enumerate(p["sejour_order"]):
             s = p["sejours"][sejour_key]
+            id_sej = s["id_sejour"]
             sejours_rows.append({
-                "patient_id": patient_id, "sejour_key": sejour_key, "ordre": ordre,
-                "id_sejour": s["id_sejour"], "service": s["service"],
-                "entree": s["entree"], "sortie": s["sortie"], "motif": s["motif"],
+                "patient_id": patient_id, "ordre": ordre, "id_sejour": id_sej,
+                "service": s["service"], "entree": s["entree"], "sortie": s["sortie"],
             })
 
-            for (eid, date, heure, typ, titre, detail, lieu) in s["parcours"]:
+            for (eid, date_, heure, typ, titre, detail, uf) in s["parcours"]:
                 parcours_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "event_id": eid,
-                    "date": date, "heure": heure, "type": typ, "titre": titre,
-                    "detail": detail, "lieu": lieu,
+                    "patient_id": patient_id, "id_sejour": id_sej, "event_id": eid,
+                    "date": date_, "heure": heure, "type": typ, "titre": titre,
+                    "detail": detail, "uf": uf,
                 })
 
-            for (did, date, typ, titre, uf, excerpt, full_text) in s["documents"]:
+            for (did, date_, typ, titre, uf, excerpt, full_text) in s["documents"]:
                 documents_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "doc_id": did,
-                    "date": date, "type": typ, "titre": titre, "uf": uf,
+                    "patient_id": patient_id, "id_sejour": id_sej, "doc_id": did,
+                    "date": date_, "type": typ, "titre": titre, "uf": uf,
                     "excerpt": excerpt, "full_text": full_text,
                 })
 
-            for (fid, titre, typ, date, uf, champs) in s.get("fiches", []):
-                for ordre, (label, valeur) in enumerate(champs):
+            for (fid, titre, typ, date_, uf, champs) in s.get("fiches", []):
+                for ordre_champ, (label, valeur) in enumerate(champs):
                     fiches_rows.append({
-                        "patient_id": patient_id, "sejour_key": sejour_key, "fiche_id": fid,
-                        "titre": titre, "type": typ, "date": date, "uf": uf,
-                        "champ_ordre": ordre, "champ_label": label, "champ_valeur": valeur,
+                        "patient_id": patient_id, "id_sejour": id_sej, "fiche_id": fid,
+                        "titre": titre, "type": typ, "date": date_, "uf": uf,
+                        "champ_ordre": ordre_champ, "champ_label": label, "champ_valeur": valeur,
                     })
 
-            for (oid, date, uf, categorie, texte) in s.get("observations", []):
+            for (oid, date_, uf, categorie, texte) in s.get("observations", []):
                 observations_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "observation_id": oid,
-                    "date": date, "uf": uf, "categorie": categorie, "texte": texte,
+                    "patient_id": patient_id, "id_sejour": id_sej, "observation_id": oid,
+                    "date": date_, "uf": uf, "categorie": categorie, "texte": texte,
                 })
 
-            for (date, fc, ta, spo2, temp, poids) in s["constantes"]:
+            for (date_, fc, ta, spo2, temp, poids) in s["constantes"]:
                 constantes_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "date": date,
+                    "patient_id": patient_id, "id_sejour": id_sej, "date": date_,
                     "fc": fc, "ta": ta, "spo2": spo2, "temp": temp, "poids": poids,
                 })
 
-            for (date, ntprobnp, creat, dfg, crp, k, hb, leuco, na, glycemie) in s["biologie"]:
-                biologie_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "date": date,
-                    "ntprobnp": ntprobnp, "creat": creat, "dfg": dfg, "crp": crp,
-                    "k": k, "hb": hb, "leuco": leuco, "na": na, "glycemie": glycemie,
-                })
-
-            for (mid, nom, dose, voie, freq, indication, debut, fin, statut) in s["medicaments"]:
-                medicaments_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "med_id": mid,
-                    "nom": nom, "dose": dose, "voie": voie, "frequence": freq,
-                    "indication": indication, "debut": debut, "fin": fin, "statut": statut,
-                })
-                for (admin_date, admin_heure) in _generate_administrations(
-                        debut, fin, freq, s["entree"], s["sortie"]):
-                    administrations_rows.append({
-                        "patient_id": patient_id, "sejour_key": sejour_key, "med_id": mid,
-                        "date": admin_date, "heure": admin_heure,
+            for (date_, *valeurs) in s["biologie"]:
+                for code, raw in zip(BIOLOGIE_CODES, valeurs):
+                    valeur, unite = _split_valeur_unite(raw)
+                    biologie_rows.append({
+                        "patient_id": patient_id, "id_sejour": id_sej, "date": date_,
+                        "code": code, "valeur": valeur, "unite": unite,
                     })
 
-            for (cid, code, typ, libelle, date, removed) in s["codes_valides"]:
+            for (nom, qte, unite, freq, debut, fin) in s["medicaments"]:
+                medicaments_rows.extend(_generate_medicament_rows(
+                    patient_id, id_sej, nom, qte, unite, freq, debut, fin, s["entree"], s["sortie"]))
+
+            for (cid, code, typ, libelle, date_, removed) in s["codes_valides"]:
                 codes_valides_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "code_id": cid,
+                    "patient_id": patient_id, "id_sejour": id_sej, "code_id": cid,
                     "code": code, "type": typ, "libelle": libelle,
-                    "date": date, "removed": removed,
+                    "date": date_, "removed": removed,
                 })
 
             for (sid, code, typ, libelle, confiance, src_kind, src_id, justification, regle_id, highlight) in s["suggestions"]:
                 suggestions_rows.append({
-                    "patient_id": patient_id, "sejour_key": sejour_key, "suggestion_id": sid,
+                    "patient_id": patient_id, "id_sejour": id_sej, "suggestion_id": sid,
                     "code": code, "type": typ, "libelle": libelle, "confiance": confiance,
                     "source_kind": src_kind, "source_id": src_id, "justification": justification,
                     "regle_id": regle_id, "highlight": highlight,
                 })
+
+        # Documents/fiches/observations hors séjour : id_sejour laissé vide.
+        hs = p.get("hors_sejour", {})
+        for (did, date_, typ, titre, uf, excerpt, full_text) in hs.get("documents", []):
+            documents_rows.append({
+                "patient_id": patient_id, "id_sejour": None, "doc_id": did,
+                "date": date_, "type": typ, "titre": titre, "uf": uf,
+                "excerpt": excerpt, "full_text": full_text,
+            })
+        for (fid, titre, typ, date_, uf, champs) in hs.get("fiches", []):
+            for ordre_champ, (label, valeur) in enumerate(champs):
+                fiches_rows.append({
+                    "patient_id": patient_id, "id_sejour": None, "fiche_id": fid,
+                    "titre": titre, "type": typ, "date": date_, "uf": uf,
+                    "champ_ordre": ordre_champ, "champ_label": label, "champ_valeur": valeur,
+                })
+        for (oid, date_, uf, categorie, texte) in hs.get("observations", []):
+            observations_rows.append({
+                "patient_id": patient_id, "id_sejour": None, "observation_id": oid,
+                "date": date_, "uf": uf, "categorie": categorie, "texte": texte,
+            })
 
     return {
         "patients": pd.DataFrame(patients_rows),
@@ -481,7 +549,6 @@ def build_tables():
         "constantes": pd.DataFrame(constantes_rows),
         "biologie": pd.DataFrame(biologie_rows),
         "medicaments": pd.DataFrame(medicaments_rows),
-        "administrations": pd.DataFrame(administrations_rows),
         "codes_valides": pd.DataFrame(codes_valides_rows),
         "suggestions": pd.DataFrame(suggestions_rows),
     }

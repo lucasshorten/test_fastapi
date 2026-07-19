@@ -256,10 +256,12 @@ tables Excel / la même API :
   cliquant dessus. Un clic sur la source d'une suggestion de codage (📎)
   ouvre directement le bon document/fiche/observation, déroulé, avec le
   passage concerné surligné.
-- **Onglet Médicaments** : grille jour par jour (un médicament par ligne, un
-  jour par colonne, scrollable horizontalement, nom du médicament fixe à
-  gauche) montrant l'heure de chaque prise réellement administrée, avec un
-  tableau détaillé de toutes les administrations en dessous.
+- **Onglet Médicaments** : tableau de toutes les prises effectivement
+  administrées pendant le séjour (date et heure exactes, ATC, UCD, quantité,
+  unité), triées chronologiquement.
+- **Documents hors séjour** : dans l'onglet Documents, un encart fixe
+  regroupe les documents/fiches/observations rattachés au patient mais à
+  aucun séjour précis — affiché quel que soit le séjour sélectionné.
 - **Panneau de codage (à droite)** : rétractable via le bouton ◀/▶, et
   défile indépendamment du reste de la page — la barre supérieure (recherche,
   navigation patient, bandeau des séjours) reste toujours visible.
@@ -289,11 +291,27 @@ tables Excel / la même API :
 
 ### Excel (lecture seule) dans `<instance>/data/`
 `patients`, `sejours`, `parcours`, `documents`, `fiches`, `observations`,
-`constantes`, `biologie`, `medicaments`, `administrations`, `codes_valides`,
-`suggestions` — un fichier `.xlsx` par table. `fiches` a une ligne par champ
-de formulaire (regroupées par `fiche_id`) et `administrations` une ligne par
-prise de médicament effective (générée automatiquement à partir de la
-fréquence de chaque médicament — voir `generate_sample_data.py`).
+`constantes`, `biologie`, `medicaments`, `codes_valides`, `suggestions` — un
+fichier `.xlsx` par table. `id_sejour` (porté par `sejours`) est l'unique clé
+de séjour, reprise telle quelle dans toutes les autres tables — il n'y a pas
+de clé technique séparée. `fiches` a une ligne par champ de formulaire
+(regroupées par `fiche_id`).
+
+`biologie` est au format long : une ligne par mesure (`patient_id`,
+`id_sejour`, `date`, `code`, `valeur`, `unite`) plutôt qu'une colonne fixe
+par analyte — `code` vaut par exemple `k`, `hb`, `dfg`, `ntprobnp`...
+
+`medicaments` est au format « une ligne par prise effective » (pas de table
+de prescription séparée) : `patient_id`, `id_sejour`, `nom`, `qte`, `unite`,
+`atc`, `ucd`, `date_administration` (date + heure, à n'importe quel moment de
+la journée).
+
+`documents`, `fiches` et `observations` tolèrent un `id_sejour` vide : ces
+lignes sont rattachées au patient mais à aucun séjour (ex. un courrier
+ambulatoire) et s'affichent dans un encart fixe de l'onglet Documents, quel
+que soit le séjour sélectionné. Dans toutes les autres tables, une ligne sans
+`id_sejour` est ignorée.
+
 `generate_sample_data.py` reprend les données fictives de votre prototype ;
 remplacez-le par votre export réel en gardant les mêmes colonnes.
 
@@ -303,16 +321,17 @@ elles ne doivent pas être exportées.
 
 Le backend (`main.py`) tolère un export réel incomplet : un fichier
 `.xlsx` absent ou totalement vide devient une table vide (pas de crash au
-démarrage), et une ligne qui ne se rattache à aucun patient/séjour
-(`patient_id` ou `sejour_key` manquant) est simplement ignorée plutôt que de
-faire planter la construction d'un dossier. Un patient sans aucun séjour
-valide s'affiche normalement dans la liste, avec un message « Aucun séjour
-enregistré » à la place du dossier.
+démarrage), et une ligne qui ne se rattache à aucun patient (`patient_id`
+manquant) est simplement ignorée plutôt que de faire planter la construction
+d'un dossier — de même pour `id_sejour` manquant, sauf sur
+`documents`/`fiches`/`observations` (voir ci-dessus). Un patient sans aucun
+séjour valide s'affiche normalement dans la liste, avec un message « Aucun
+séjour enregistré » à la place du dossier.
 
 ### CSV (écriture) dans `<instance>/data/annotations/`
 Un fichier `annotations_<nom_utilisateur>.csv` par annotateur → aucune
 écriture concurrente possible même si plusieurs personnes valident des
-codes en même temps. Colonnes : `timestamp, user, patient_id, sejour_key,
+codes en même temps. Colonnes : `timestamp, user, patient_id, id_sejour,
 item_type, item_id, action, code, libelle, type_code, commentaire`.
 
 Pour consolider tous les CSV d'une instance en un seul DataFrame :

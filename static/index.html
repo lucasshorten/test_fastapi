@@ -10,7 +10,7 @@
     - Recherche de contenu (barre de gauche) agrandie : police et bascule
       "Ce séjour" / "Tout le dossier" plus lisibles.
     - Chaque case du bandeau des séjours affiche désormais un identifiant de
-      séjour (ex: ID0000123), en plus des dates/service/motif.
+      séjour (ex: ID0000123), en plus des dates/service.
 
   Données 100% fictives et anonymisées (identifiants d'étude, pas de noms/dates
   de naissance réelles) — ce sont des dossiers "recherche".
@@ -85,7 +85,7 @@
   .topbar-patient { display: flex; align-items: center; gap: 8px; }
   .tp-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0; }
   .tp-id { font-weight: 700; font-size: 12.5px; }
-  .tp-motif { font-size: 11px; opacity: .95; }
+  .tp-service { font-size: 11px; opacity: .95; }
   .tp-meta { font-weight: 400; opacity: .85; font-size: 10.5px; }
 
   .patient-search-inline { position: relative; display: flex; align-items: center; gap: 6px; }
@@ -101,7 +101,6 @@
   .sc-id { font-family: var(--mono); font-weight: 700; font-size: 11px; color: var(--accent); }
   .sc-date { font-size: 10.5px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
   .sc-service { font-size: 12.5px; font-weight: 700; margin-top: 2px; }
-  .sc-motif { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
   /* ---------- rail de navigation (module actif du tableau de bord) ---------- */
   .nav-rail { width: 96px; flex: 0 0 96px; height: calc(100vh - 190px); background: var(--panel); border-right: 1px solid var(--border); padding: 14px 0; display: flex; flex-direction: column; gap: 2px; }
@@ -123,7 +122,7 @@
 
   .doc-title { font-weight: 600; font-size: 13.5px; }
   .doc-meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-  .doc-excerpt { font-size: 13px; line-height: 1.55; color: #33424d; }
+  .doc-excerpt { font-size: 13px; line-height: 1.55; color: #33424d; white-space: pre-wrap; }
 
   .doc-subtabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
   .doc-subtab { border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -141,20 +140,12 @@
 
   .fiche-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
   .fiche-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
-  .fiche-value { font-size: 13px; background: var(--gray-soft); border-radius: 6px; padding: 6px 9px; border: 1px solid var(--border); }
+  .fiche-value { font-size: 13px; background: var(--gray-soft); border-radius: 6px; padding: 6px 9px; border: 1px solid var(--border); white-space: pre-wrap; }
 
-  /* ---------- tableau de bord des médicaments : grille jour par jour ---------- */
-  .med-name { font-weight: 600; font-size: 13px; }
-  .med-sub { color: var(--muted); font-size: 11px; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
-  .med-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-  .med-grid { border-collapse: collapse; font-size: 12.5px; width: 100%; }
-  .med-grid th, .med-grid td { padding: 8px 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; white-space: nowrap; }
-  .med-grid thead th { background: var(--gray-soft); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; font-family: var(--mono); }
-  .med-grid tbody tr:last-child td { border-bottom: none; }
-  .med-grid-label { text-align: left; min-width: 190px; background: var(--panel); position: sticky; left: 0; border-right: 2px solid var(--border); }
-  .med-grid thead .med-grid-label { background: var(--gray-soft); z-index: 1; }
-  .med-grid-cell.has-dose { color: var(--accent); font-family: var(--mono); font-weight: 600; }
-  .med-grid-cell.out-of-range { background: var(--gray-soft); opacity: .5; }
+  /* ---------- documents/fiches/observations hors séjour ---------- */
+  .hors-sejour-box { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; background: #fbfcfe; }
+  .hors-sejour-head { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
+  .hors-sejour-head .hs-meta { font-weight: 400; text-transform: none; letter-spacing: normal; }
 
   .marker-row { font-size: 12.5px; margin: 4px 0; display: flex; align-items: center; gap: 6px; }
   .marker-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
@@ -489,7 +480,7 @@ function answerChat(query) {
   const candidates = [];
   s.documents.forEach(d => candidates.push({ kind: "document", id: d.id, label: d.titre, text: (d.titre + " " + (d.fullText || d.excerpt)).toLowerCase() }));
   s.parcours.forEach(e => candidates.push({ kind: "parcours", id: e.id, label: e.titre, text: (e.titre + " " + e.detail).toLowerCase() }));
-  s.medicaments.forEach(m => candidates.push({ kind: "medicament", id: m.id, label: m.nom, text: (m.nom + " " + m.indication).toLowerCase() }));
+  s.medicaments.forEach(m => candidates.push({ kind: "medicament", id: m.id, label: m.nom, text: (m.nom + " " + (m.atc || "")).toLowerCase() }));
   s.fiches.forEach(f => candidates.push({ kind: "fiche", id: f.id, label: f.titre, text: (f.titre + " " + f.champs.map(c => c.label + " " + c.valeur).join(" ")).toLowerCase() }));
   s.observations.forEach(o => candidates.push({ kind: "observation", id: o.id, label: `Observation — ${o.categorie}`, text: (o.categorie + " " + o.texte).toLowerCase() }));
 
@@ -515,7 +506,7 @@ function matchingPatients() {
   return list.filter(p => {
     const main = p.sejours[p.sejourOrder[0]];
     if (!main) return p.identity.id.toLowerCase().includes(q);
-    return p.identity.id.toLowerCase().includes(q) || main.service.toLowerCase().includes(q) || main.motif.toLowerCase().includes(q);
+    return p.identity.id.toLowerCase().includes(q) || main.service.toLowerCase().includes(q);
   });
 }
 
@@ -527,7 +518,7 @@ function renderSearchDropdown() {
       const main = p.sejours[p.sejourOrder[0]];
       return `<div class="search-result ${p.identity.id===currentPatientId?'current':''}" data-action="select-patient" data-id="${p.identity.id}">
         <span class="sr-avatar" style="background:${main ? (SERVICE_COLOR[main.service]||'#64748b') : '#64748b'}">${p.identity.id.slice(-2)}</span>
-        <div><div class="sr-title">${p.identity.id}${main ? ` — ${main.service}` : ""}</div><div class="sr-meta">${p.identity.sexe} · ${p.identity.age} ans${main ? ` · ${main.motif}` : " · Aucun séjour"}</div></div>
+        <div><div class="sr-title">${p.identity.id}${main ? ` — ${main.service}` : ""}</div><div class="sr-meta">${p.identity.sexe} · ${p.identity.age} ans${main ? "" : " · Aucun séjour"}</div></div>
       </div>`;
     }).join("")}
   </div>`;
@@ -541,7 +532,7 @@ function searchableItems(scope) {
     const s = p.sejours[sid];
     s.parcours.forEach(e => items.push({ sejourId: sid, kind: "parcours", id: e.id, label: e.titre, sub: e.detail, date: e.date }));
     s.documents.forEach(d => items.push({ sejourId: sid, kind: "document", id: d.id, label: d.titre, sub: d.excerpt, date: d.date }));
-    s.medicaments.forEach(m => items.push({ sejourId: sid, kind: "medicament", id: m.id, label: m.nom, sub: `${m.dose} · ${m.indication}`, date: m.debut }));
+    s.medicaments.forEach(m => items.push({ sejourId: sid, kind: "medicament", id: m.id, label: m.nom, sub: `${m.qte} ${m.unite} · ${m.atc || ""}`, date: (m.dateAdministration || "").split(" ")[0] }));
     s.fiches.forEach(f => items.push({ sejourId: sid, kind: "fiche", id: f.id, label: f.titre, sub: f.champs.map(c => c.valeur).join(" · "), date: f.date }));
     s.observations.forEach(o => items.push({ sejourId: sid, kind: "observation", id: o.id, label: `Observation — ${o.categorie}`, sub: o.texte, date: o.date }));
   });
@@ -604,14 +595,14 @@ function renderTopBar() {
                 <span class="tp-avatar">${p.identity.id.slice(-2)}</span>
                 <div>
                   <div class="tp-id">${p.identity.id} <span class="tp-meta">${p.identity.sexe} · ${p.identity.age} ans</span></div>
-                  <div class="tp-motif">${s ? `${s.service} <span class="tp-meta">· ${s.motif}</span>` : `<span class="tp-meta">Aucun séjour enregistré</span>`}</div>
+                  <div class="tp-service">${s ? s.service : `<span class="tp-meta">Aucun séjour enregistré</span>`}</div>
                 </div>
               </div>
               <button class="patient-nav-btn" data-action="next-patient" title="Patient suivant">▶</button>
             </div>
             <div class="patient-search-inline">
               <span class="psi-dot" style="background:${accent}" title="Couleur du service actuel"></span>
-              <input type="text" id="patient-search-input" placeholder="Autre patient (identifiant, service, motif…)" value="${searchState.query}" autocomplete="off">
+              <input type="text" id="patient-search-input" placeholder="Autre patient (identifiant, service…)" value="${searchState.query}" autocomplete="off">
               ${searchState.open ? renderSearchDropdown() : ""}
             </div>
           </div>
@@ -638,7 +629,6 @@ function renderSejoursBar() {
         <div class="sc-id">${sj.idSejour}</div>
         <div class="sc-date">${formatDateFr(sj.entree)} → ${formatDateFr(sj.sortie)}</div>
         <div class="sc-service" style="color:${SERVICE_COLOR[sj.service]||'#475569'}">${sj.service}</div>
-        <div class="sc-motif">${sj.motif}</div>
       </div>`;
     }).join("")}
   </div>`;
@@ -666,77 +656,16 @@ function renderParcoursPathH() {
 /* Contenu des onglets — vraies vues détaillées (Résumé / Parcours /
    Documents / Biologie / Médicaments)                                 */
 /* ------------------------------------------------------------------ */
-function isoDateLocal(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function sejourDayList() {
-  const s = sejour();
-  const days = [];
-  const d = new Date(s.entree + "T00:00:00");
-  const last = new Date(s.sortie + "T00:00:00");
-  while (d <= last) {
-    days.push(isoDateLocal(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return days;
-}
-
-function renderMedGridRow(m, days) {
-  const s = sejour();
-  const active = m.statut === "en cours";
-  const end = m.fin || s.sortie;
-  return `<tr class="${isActive('medicament',m.id)?'flash-highlight':''}" data-anchor="${m.id}">
-    <td class="med-grid-label">
-      <div class="med-name">${m.nom}</div>
-      <div class="med-sub">${m.dose} · ${m.voie} · ${m.frequence}</div>
-      <div class="med-sub">${statusDot(active?'good':'warn')} ${active ? 'En cours' : 'Arrêté le ' + formatDateFr(m.fin)}</div>
-    </td>
-    ${days.map(d => {
-      const doses = s.administrations.filter(a => a.medId === m.id && a.date === d);
-      if (doses.length) return `<td class="med-grid-cell has-dose">${doses.map(a => a.heure).join(" · ")}</td>`;
-      const withinWindow = d >= m.debut && d <= end;
-      return `<td class="med-grid-cell ${withinWindow ? '' : 'out-of-range'}">${withinWindow ? '—' : ''}</td>`;
-    }).join("")}
-  </tr>`;
-}
-
-function renderMedicamentsGrid() {
-  const meds = sejour().medicaments;
-  const days = sejourDayList();
-  return `<div class="med-grid-wrap">
-    <table class="med-grid">
-      <thead>
-        <tr>
-          <th class="med-grid-label"></th>
-          ${days.map(d => `<th>${formatDateFr(d)}</th>`).join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${meds.map(m => renderMedGridRow(m, days)).join("")}
-      </tbody>
-    </table>
-  </div>`;
-}
-
-function renderMedicamentsAdminTable() {
-  const s = sejour();
-  if (s.administrations.length === 0) return "";
-  const medById = id => s.medicaments.find(m => m.id === id);
-  const rows = [...s.administrations].sort((a,b) => (a.date+a.heure).localeCompare(b.date+b.heure));
-  return `<h4 style="margin:16px 0 8px">Détail des administrations</h4>
-    <table class="datatable">
-      <tr><th>Date</th><th>Heure</th><th>Médicament</th><th>Dose</th><th>Voie</th></tr>
-      ${rows.map(a => {
-        const m = medById(a.medId);
-        return `<tr><td>${formatDateFr(a.date)}</td><td>${a.heure}</td><td>${m ? m.nom : a.medId}</td><td>${m ? m.dose : ''}</td><td>${m ? m.voie : ''}</td></tr>`;
-      }).join("")}
-    </table>`;
-}
-
 function renderMedicamentsDashboard() {
   const meds = sejour().medicaments;
   if (meds.length === 0) return `<p style="color:var(--muted);font-size:12.5px">Aucun traitement enregistré pour ce séjour.</p>`;
-  return `${renderMedicamentsGrid()}${renderMedicamentsAdminTable()}`;
+  const rows = [...meds].sort((a,b) => (a.dateAdministration||"").localeCompare(b.dateAdministration||""));
+  return `<table class="datatable">
+    <tr><th>Date d'administration</th><th>Médicament</th><th>ATC</th><th>UCD</th><th>Qté</th><th>Unité</th></tr>
+    ${rows.map(m => `<tr class="${isActive('medicament',m.id)?'flash-highlight':''}" data-anchor="${m.id}">
+      <td>${m.dateAdministration || ""}</td><td>${m.nom}</td><td>${m.atc || ""}</td><td>${m.ucd || ""}</td><td>${m.qte}</td><td>${m.unite}</td>
+    </tr>`).join("")}
+  </table>`;
 }
 
 function renderDocumentsSubTabs() {
@@ -810,29 +739,95 @@ function renderDocumentsSubContent() {
   return renderDocumentsList();
 }
 
+/* ------------------------------------------------------------------ */
+/* Documents/fiches/observations hors séjour : rattachés au patient, pas   */
+/* à un séjour précis — affichés dans un encart fixe, quel que soit le      */
+/* séjour sélectionné.                                                      */
+/* ------------------------------------------------------------------ */
+function renderHorsSejourBox() {
+  const hs = patient().horsSejour;
+  const items = hs ? (hs[documentsSubTab] || []) : [];
+  if (items.length === 0) return "";
+  let body;
+  if (documentsSubTab === "fiches") {
+    body = items.map(f => {
+      const open = openFicheId === f.id;
+      return `<div class="acc-item">
+        <button class="acc-header" data-action="toggle-accordion" data-kind="fiche" data-id="${f.id}">
+          <span class="acc-caret">${open ? '▾' : '▸'}</span>
+          <span class="acc-title">${f.titre}</span>
+          <span class="acc-meta">${formatDateFr(f.date)} · ${f.uf}</span>
+        </button>
+        ${open ? `<div class="acc-body">
+          <div class="doc-meta">${f.type}</div>
+          <div class="fiche-form">
+            ${f.champs.map(c => `<div class="fiche-field"><label>${c.label}</label><div class="fiche-value">${c.valeur}</div></div>`).join("")}
+          </div>
+        </div>` : ""}
+      </div>`;
+    }).join("");
+  } else if (documentsSubTab === "observations") {
+    body = items.map(o => {
+      const open = openObservationId === o.id;
+      return `<div class="acc-item">
+        <button class="acc-header" data-action="toggle-accordion" data-kind="observation" data-id="${o.id}">
+          <span class="acc-caret">${open ? '▾' : '▸'}</span>
+          <span class="acc-title">Observation — ${o.categorie}</span>
+          <span class="acc-meta">${formatDateFr(o.date)} · ${o.uf}</span>
+        </button>
+        ${open ? `<div class="acc-body"><div class="doc-excerpt">${o.texte}</div></div>` : ""}
+      </div>`;
+    }).join("");
+  } else {
+    body = items.map(d => {
+      const open = openDocumentId === d.id;
+      return `<div class="acc-item">
+        <button class="acc-header" data-action="toggle-accordion" data-kind="document" data-id="${d.id}">
+          <span class="acc-caret">${open ? '▾' : '▸'}</span>
+          <span class="acc-title">${d.titre}</span>
+          <span class="acc-meta">${formatDateFr(d.date)} · ${d.uf}</span>
+        </button>
+        ${open ? `<div class="acc-body">
+          <div class="doc-meta">${d.type}</div>
+          <div class="doc-excerpt">${d.fullText || d.excerpt}</div>
+        </div>` : ""}
+      </div>`;
+    }).join("");
+  }
+  return `<div class="hors-sejour-box">
+    <div class="hors-sejour-head">📌 Hors séjour <span class="hs-meta">— indépendant du séjour sélectionné</span></div>
+    ${body}
+  </div>`;
+}
+
+function latestBio(s, code) {
+  const rows = s.biologie.filter(b => b.code === code);
+  return rows.length ? rows[rows.length - 1] : null;
+}
+
 function renderTabPanel(tab) {
   const p = patient();
   const s = sejour();
   if (tab === "resume") {
-    const lastB = s.biologie.length ? s.biologie[s.biologie.length-1] : null;
     const lastC = s.constantes.length ? s.constantes[s.constantes.length-1] : null;
+    const bioRows = [
+      ["ntprobnp", "NT-proBNP"],
+      ["dfg", "DFG"],
+      ["crp", "CRP"],
+    ].map(([code, label]) => [label, latestBio(s, code)]).filter(([, b]) => b);
     return `<div class="tab-panel">
       <div class="resume-grid">
-        <div><span class="rg-label">Motif d'admission</span><div class="rg-value">${s.motif}</div></div>
         <div><span class="rg-label">Service</span><div class="rg-value">${s.service}</div></div>
         <div><span class="rg-label">Séjour</span><div class="rg-value">${formatDateFr(s.entree)} → ${formatDateFr(s.sortie)} (${daysBetween(s.entree,s.sortie)} j)</div></div>
         <div><span class="rg-label">Patient</span><div class="rg-value">${p.identity.sexe} · ${p.identity.age} ans · ${p.identity.id}</div></div>
-        <div><span class="rg-label">Dossier</span><div class="rg-value">${s.documents.length} document(s) · ${s.medicaments.length} traitement(s) · ${s.codesValides.filter(v=>!v.removed).length} code(s) validé(s)</div></div>
+        <div><span class="rg-label">Dossier</span><div class="rg-value">${s.documents.length} document(s) · ${new Set(s.medicaments.map(m=>m.nom)).size} traitement(s) · ${s.codesValides.filter(v=>!v.removed).length} code(s) validé(s)</div></div>
       </div>
       <h4 style="margin:16px 0 8px">Constantes &amp; biologie (dernier relevé)</h4>
       ${lastC ? `
       <div class="marker-row">${statusDot(vitalStatus('fc', lastC.fc))} FC ${lastC.fc} bpm</div>
       <div class="marker-row">${statusDot(vitalStatus('ta', lastC.ta))} TA ${lastC.ta} mmHg</div>
       <div class="marker-row">${statusDot(vitalStatus('spo2', lastC.spo2))} SpO2 ${lastC.spo2}</div>` : `<p style="color:var(--muted);font-size:12.5px">Aucune constante enregistrée pour ce séjour.</p>`}
-      ${lastB ? `
-      <div class="marker-row">${statusDot(bioStatus('ntprobnp', lastB.ntprobnp))} NT-proBNP ${lastB.ntprobnp}</div>
-      <div class="marker-row">${statusDot(bioStatus('dfg', lastB.dfg))} DFG ${lastB.dfg}</div>
-      <div class="marker-row">${statusDot(bioStatus('crp', lastB.crp))} CRP ${lastB.crp}</div>` : `<p style="color:var(--muted);font-size:12.5px">Aucune biologie enregistrée pour ce séjour.</p>`}
+      ${bioRows.length ? bioRows.map(([label, b]) => `<div class="marker-row">${statusDot(bioStatus(b.code, b.valeur))} ${label} ${b.valeur} ${b.unite}</div>`).join("") : `<p style="color:var(--muted);font-size:12.5px">Aucune biologie enregistrée pour ce séjour.</p>`}
       <p style="color:var(--muted);margin-top:10px">Identifiant d'étude ${p.identity.id} — dossier de recherche anonymisé.</p>
     </div>`;
   }
@@ -840,14 +835,15 @@ function renderTabPanel(tab) {
     return `<div class="tab-panel">
       ${renderParcoursPathH()}
       <table class="datatable" style="margin-top:14px">
-        <tr><th>Date</th><th>Type</th><th>Évènement</th><th>Lieu</th><th>Détail</th></tr>
-        ${s.parcours.map(e => `<tr><td>${e.date} ${e.heure}</td><td>${e.type}</td><td>${e.titre}</td><td>${e.lieu}</td><td style="color:var(--muted);white-space:normal">${e.detail}</td></tr>`).join("")}
+        <tr><th>Date</th><th>Type</th><th>Évènement</th><th>UF</th><th>Détail</th></tr>
+        ${s.parcours.map(e => `<tr><td>${e.date} ${e.heure}</td><td>${e.type}</td><td>${e.titre}</td><td>${e.uf}</td><td style="color:var(--muted);white-space:normal">${e.detail}</td></tr>`).join("")}
       </table>
     </div>`;
   }
   if (tab === "documents") {
     return `<div class="tab-panel">
       ${renderDocumentsSubTabs()}
+      ${renderHorsSejourBox()}
       ${renderDocumentsSubContent()}
     </div>`;
   }
@@ -866,15 +862,11 @@ function renderTabPanel(tab) {
       </table>
       <h4 style="margin:16px 0 8px">Biologie</h4>
       <table class="datatable">
-        <tr><th>Date</th><th>NT-proBNP</th><th>Créat.</th><th>DFG</th><th>CRP</th><th>K+</th><th>Hb</th><th>Leuco</th><th>Na+</th><th>Glycémie</th></tr>
+        <tr><th>Date</th><th>Code</th><th>Valeur</th><th>Unité</th></tr>
         ${s.biologie.map(b => `<tr>
           <td>${b.date}</td>
-          <td>${statusDot(bioStatus('ntprobnp',b.ntprobnp))} ${b.ntprobnp}</td>
-          <td>${statusDot(bioStatus('creat',b.creat))} ${b.creat}</td>
-          <td>${statusDot(bioStatus('dfg',b.dfg))} ${b.dfg}</td>
-          <td>${statusDot(bioStatus('crp',b.crp))} ${b.crp}</td>
-          <td>${statusDot(bioStatus('k',b.k))} ${b.k}</td>
-          <td>${b.hb}</td><td>${b.leuco}</td><td>${b.na}</td><td>${b.glycemie}</td>
+          <td>${statusDot(bioStatus(b.code,b.valeur))} ${b.code}</td>
+          <td>${b.valeur}</td><td>${b.unite}</td>
         </tr>`).join("")}
       </table>
     </div>`;
@@ -1529,7 +1521,7 @@ function postAnnotation(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       patient_id: currentPatientId,
-      sejour_key: currentSejourId,
+      id_sejour: currentSejourId,
       commentaire: "",
       ...payload
     })
